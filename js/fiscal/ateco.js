@@ -1,6 +1,9 @@
 // Mappa codice ATECO 2007 -> gruppo di settore e coefficiente di redditività.
 // Fonte: Allegato 4 L. 190/2014 (testo pubblicato dall'Agenzia delle Entrate).
-// Le tabelle sono in ATECO 2007: per codici ATECO 2025 serve una conversione (non ancora implementata).
+// L'Allegato 4 è espresso in ATECO 2007, la cui articolazione per gruppo coincide con ATECO 2022.
+// Per i codici ATECO 2025 si passa dalla tavola di raccordo ISTAT 2025-2022 (data/ateco2025.js).
+
+import ATECO2025 from './data/ateco2025.js';
 
 const GRUPPI_PER_DIVISIONE = [
   ['industrie-alimentari-bevande', [10, 11]],
@@ -35,4 +38,17 @@ export function gruppoAteco(codice) {
 export function coefficienteAteco(codice, params) {
   const g = gruppoAteco(codice);
   return g ? { gruppo: g, coefficiente: params.forfettario.coefficienti[g] } : null;
+}
+
+/**
+ * Coefficiente per un codice ATECO 2025. Il raccordo con l'ATECO 2022 non è sempre univoco
+ * (alcune attività sono state ripartite tra più codici): in tal caso `univoco` è false e
+ * `candidati` elenca i gruppi possibili, tra cui l'utente deve scegliere.
+ */
+export function coefficienteAteco2025(codice, params) {
+  const indici = ATECO2025[String(codice).trim()];
+  if (!indici) return null;
+  const nomi = Object.keys(params.forfettario.coefficienti);
+  const candidati = [...indici].map((i) => ({ gruppo: nomi[Number(i)], coefficiente: params.forfettario.coefficienti[nomi[Number(i)]] }));
+  return { univoco: candidati.length === 1, candidati };
 }

@@ -7,7 +7,7 @@ import { calcolaForfettario, aliquotaSostitutiva, bolloDovuto } from '../js/fisc
 import { calcolaOrdinario } from '../js/fiscal/ordinario.js';
 import { confrontaRegimi, scenari } from '../js/fiscal/confronto.js';
 import { verificaSoglieRicavi, verificaCauseEsclusione, verificaRequisitiStartup } from '../js/fiscal/requisiti.js';
-import { gruppoAteco, coefficienteAteco } from '../js/fiscal/ateco.js';
+import { gruppoAteco, coefficienteAteco, coefficienteAteco2025 } from '../js/fiscal/ateco.js';
 import { accontiSostitutiva, saldoSostitutiva } from '../js/fiscal/acconti.js';
 
 const p = parametriAnno(2026);
@@ -171,7 +171,7 @@ test('cause di esclusione', () => {
 test('acconti sostitutiva', () => {
   assert.deepEqual(accontiSostitutiva(p, 40), { prima: 0, seconda: 0, totale: 0 });
   assert.deepEqual(accontiSostitutiva(p, 200), { prima: 0, seconda: 200, totale: 200 });
-  assert.deepEqual(accontiSostitutiva(p, 1001), { prima: 400.4, seconda: 600.6, totale: 1001 });
+  assert.deepEqual(accontiSostitutiva(p, 1001), { prima: 500.5, seconda: 500.5, totale: 1001 });
   assert.equal(saldoSostitutiva(4000, 3000), 1000);
   assert.equal(saldoSostitutiva(2000, 3000), -1000);
 });
@@ -206,4 +206,17 @@ test('ATECO 2007 -> coefficiente', () => {
   assert.equal(coefficienteAteco('43.21.01', p).coefficiente, 0.86);
   assert.equal(coefficienteAteco('56.10.11', p).coefficiente, 0.4);
   assert.equal(gruppoAteco('00.00'), null);
+});
+
+test('ATECO 2025 -> coefficiente tramite raccordo ISTAT', () => {
+  const sw = coefficienteAteco2025('62.10.00', p);
+  assert.equal(sw.univoco, true);
+  assert.equal(sw.candidati[0].coefficiente, 0.67);
+  const interm = coefficienteAteco2025('46.11.01', p);
+  assert.equal(interm.candidati[0].gruppo, 'intermediari-commercio');
+  assert.equal(coefficienteAteco2025('85.59.20', p).candidati[0].coefficiente, 0.78);
+  const amb = coefficienteAteco2025('43.31.02', p);
+  assert.equal(amb.univoco, false);
+  assert.ok(amb.candidati.length > 1);
+  assert.equal(coefficienteAteco2025('99.99.99', p), null);
 });

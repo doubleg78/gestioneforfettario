@@ -19,19 +19,20 @@ export default {
     // solo gestioni artigiani/commercianti L. 233/1990; richiesta all'INPS)
     riduzioneContributiIvs: 0.35,
     // Acconto: 100% dell'imposta dell'anno precedente (metodo storico), 2 rate.
-    // Il c. 64 rinvia alle regole di versamento IRPEF (art. 17 DPR 435/2001: 40% + 60%).
-    // Il 50%+50% (art. 58 DL 124/2019) vale per i soggetti ISA, non per i forfettari: v. nota in BRIEFING.md.
-    acconto: { sogliaMinima: 51.65, sogliaRataUnica: 257.52, percentualeRata1: 0.4 },
+    // Ripartizione 50% + 50% (confermata dall'utente per i forfettari; art. 58 DL 124/2019 per i soggetti ISA).
+    // Il testo letterale (c. 64 + art. 17 DPR 435/2001) porterebbe a 40% + 60%: v. BRIEFING.md.
+    acconto: { sogliaMinima: 51.65, sogliaRataUnica: 257.52, percentualeRata1: 0.5 },
     // Codici tributo F24 (Risoluzione AdE 59/E del 11/6/2015)
     codiciTributo: { accontoPrimaRata: '1790', accontoSecondaRataOUnica: '1791', saldo: '1792' },
     // Soglia 35.000: L. 199/2025 c. 27 estende al 2026 il c. 12 art. 1 L. 207/2024 (fonti secondarie concordi).
     // Coefficienti: Allegato 4 L. 190/2014 nel testo pubblicato da AdE; codici ATECO 2007 (v. `atecoDivisioni`).
     // Scadenze: v. `scadenze` (DL 89/2026 art. 6 per la proroga 2026).
-    daVerificare: ['acconto 40/60 vs prassi AdE', 'conversione ATECO 2025'],
+    daVerificare: [],
     // Coefficienti di redditività per gruppo di settore (Allegato 4 L. 190/2014)
     scadenze: {
-      saldoEPrimoAcconto: '06-30',        // ordinaria; nel 2026 prorogata al 20/7 (DL 89/2026 art. 6),
-      saldoEPrimoAccontoProroga2026: '07-20', // con +0,80% fino al 20/8 (fonti secondarie)
+      saldoEPrimoAcconto: '06-30',        // ordinaria; nel 2026 prorogata al 20/7 (art. 6 DL 89/2026,
+      saldoEPrimoAccontoProroga2026: '07-20', // poi abrogato dalla L. 113/2026 con effetti fatti salvi),
+                                          // con +0,80% fino al 20/8
       secondoAcconto: '11-30',
       dichiarazione: '10-31',
     },
