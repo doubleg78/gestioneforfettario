@@ -62,3 +62,21 @@ test('nessuna voce ATECO: nessun calcolo forfettario', () => {
   assert.equal(r.forfettario, null);
   assert.equal(r.ricavi, 15000);
 });
+
+test('contributi dedotti per cassa: stima dall\'anno precedente o importo registrato', () => {
+  const { c, dati } = scenario();
+  const paramsPrec = p;
+  // 2025: incassi 10.000 al 78% -> contributi di competenza 7.800 * 26,07%
+  dati.fatture.push({ id: 'x', clienteId: 'c1', data: '2025-02-01', dataIncasso: '2025-03-01', importo: 10000, atecoCodice: '70.22.09' });
+  const competenza = riepilogoAnno(c, dati, 2026, p);
+  assert.equal(competenza.deduzione.metodo, 'competenza');
+  const stima = riepilogoAnno(c, dati, 2026, p, { paramsPrec });
+  assert.equal(stima.deduzione.metodo, 'stima');
+  assert.equal(stima.deduzione.importo, 2033.46);                    // 7.800 * 26,07%
+  assert.equal(stima.forfettario.imponibile, stima.forfettario.redditoLordo - 2033.46);
+  c.versamenti = { 2026: { contributiVersatiAnno: 3000 } };
+  const reg = riepilogoAnno(c, dati, 2026, p, { paramsPrec });
+  assert.equal(reg.deduzione.metodo, 'registrati');
+  assert.equal(reg.forfettario.imponibile, reg.forfettario.redditoLordo - 3000);
+  assert.equal(reg.forfettario.contributi.totale, competenza.forfettario.contributi.totale);  // la competenza non cambia
+});

@@ -1,0 +1,110 @@
+/* Token di stile. Palette dei grafici (teal / arancio) validata con lo script di dataviz, chiaro e scuro. */
+:root {
+  --sfondo: #f5f6f8;
+  --card: #ffffff;
+  --card-2: #fafbfc;
+  --ink: #0f1722;
+  --ink-2: #3a4556;
+  --muted: #637086;
+  --line: #e3e7ee;
+  --line-forte: #cdd5e1;
+
+  --primario: #0f766e;
+  --primario-hover: #0b5f58;
+  --primario-testo: #ffffff;
+  --primario-wash: #e5f4f1;
+  --focus: #1d6fe0;
+
+  --barra: #0b1220;
+  --barra-testo: #aab6cb;
+  --barra-forte: #ffffff;
+  --barra-hover: rgba(255, 255, 255, .07);
+  --barra-attivo: rgba(45, 212, 191, .14);
+  --barra-accento: #2dd4bf;
+  --barra-line: rgba(255, 255, 255, .09);
+
+  --ok: #137a43;         --ok-sfondo: #e4f5ea;
+  --attenzione: #8a5300; --attenzione-sfondo: #fff2d4;
+  --errore: #b42318;     --errore-sfondo: #fdeae8;
+  --info: #1b56a5;       --info-sfondo: #e6effa;
+
+  --serie-1: #0d9488;
+  --serie-2: #e8672a;
+  --griglia: #e8ecf2;
+  --asse: #b6c0d0;
+  --tick: #637086;
+  --riferimento: #b42318;
+
+  --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  --raggio-sm: 6px;
+  --raggio: 10px;
+  --raggio-lg: 14px;
+  --ombra-1: 0 1px 2px rgba(15, 23, 34, .05);
+  --ombra-2: 0 2px 8px rgba(15, 23, 34, .07);
+  --ombra-overlay: 0 18px 50px rgba(8, 15, 28, .28);
+  --larghezza-barra: 264px;
+  --altezza-topbar: 60px;
+  --transizione: 140ms cubic-bezier(.2, .7, .3, 1);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-tema="chiaro"]) {
+    --sfondo: #090e17;
+    --card: #101827;
+    --card-2: #0d1522;
+    --ink: #e8edf5;
+    --ink-2: #c3ccdb;
+    --muted: #8f9db3;
+    --line: #1d283b;
+    --line-forte: #2b394f;
+    --primario: #2dd4bf;
+    --primario-hover: #5eead4;
+    --primario-testo: #04201c;
+    --primario-wash: #0f2a2a;
+    --focus: #6ea8ff;
+    --barra: #060a12;
+    --ok: #5ed08f;         --ok-sfondo: #11291d;
+    --attenzione: #f0b44f; --attenzione-sfondo: #33260a;
+    --errore: #ff8f86;     --errore-sfondo: #38161a;
+    --info: #86bdf5;       --info-sfondo: #10253d;
+    --serie-1: #1fa396;
+    --serie-2: #d95926;
+    --griglia: #1b2638;
+    --asse: #3a4a66;
+    --tick: #8f9db3;
+    --riferimento: #ff8f86;
+    --ombra-1: none;
+    --ombra-2: none;
+    --ombra-overlay: 0 18px 50px rgba(0, 0, 0, .6);
+  }
+}
+
+:root[data-tema="scuro"] {
+  --sfondo: #090e17;
+  --card: #101827;
+  --card-2: #0d1522;
+  --ink: #e8edf5;
+  --ink-2: #c3ccdb;
+  --muted: #8f9db3;
+  --line: #1d283b;
+  --line-forte: #2b394f;
+  --primario: #2dd4bf;
+  --primario-hover: #5eead4;
+  --primario-testo: #04201c;
+  --primario-wash: #0f2a2a;
+  --focus: #6ea8ff;
+  --barra: #060a12;
+  --ok: #5ed08f;         --ok-sfondo: #11291d;
+  --attenzione: #f0b44f; --attenzione-sfondo: #33260a;
+  --errore: #ff8f86;     --errore-sfondo: #38161a;
+  --info: #86bdf5;       --info-sfondo: #10253d;
+  --serie-1: #1fa396;
+  --serie-2: #d95926;
+  --griglia: #1b2638;
+  --asse: #3a4a66;
+  --tick: #8f9db3;
+  --riferimento: #ff8f86;
+  --ombra-1: none;
+  --ombra-2: none;
+  --ombra-overlay: 0 18px 50px rgba(0, 0, 0, .6);
+}

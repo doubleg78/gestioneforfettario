@@ -7,10 +7,12 @@ import { contributiPrevidenziali } from './inps.js';
 export function detrazioneLavoroAutonomo(redditoComplessivo, params) {
   const d = params.irpef.detrazioneLavoroAutonomo;
   const r = redditoComplessivo;
+  // Il quoziente si usa troncato alla quarta cifra decimale (specifiche tecniche AdE, Redditi PF 2026)
+  const quoziente = (num, den) => Math.floor((num / den) * 10000 + 1e-9) / 10000;
   let importo = 0;
   if (r <= d.finoA) importo = d.importoFisso;
-  else if (r <= d.finoA2) importo = d.base + (d.extra * (d.finoA2 - r)) / d.divisore;
-  else if (r <= d.finoA3) importo = (d.base * (d.finoA3 - r)) / d.divisore3;
+  else if (r <= d.finoA2) importo = d.base + d.extra * quoziente(d.finoA2 - r, d.divisore);
+  else if (r <= d.finoA3) importo = d.base * quoziente(d.finoA3 - r, d.divisore3);
   if (importo > 0 && r > d.aumento.da && r <= d.aumento.a) importo += d.aumento.importo;
   return round2(importo);
 }

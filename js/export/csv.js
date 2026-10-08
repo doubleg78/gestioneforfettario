@@ -44,3 +44,10 @@ export function csvConfronto(confronto) {
     ['Netto disponibile', f.netto, o.netto],
   ]);
 }
+
+export function csvAgenda(voci) {
+  return generaCsv(
+    ['Scadenza', 'Cliente', 'Versamento', 'Importo', 'Codice F24', 'Stato'],
+    voci.map((v) => [dataIt(v.data), v.cliente.nome, v.descrizione, v.importo, v.codiceTributo ?? (v.causaleInps ? `INPS ${v.causaleInps}` : ''), v.versata ? `Versato il ${dataIt(v.versata)}` : '']),
+  );
+}

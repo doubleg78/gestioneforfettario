@@ -1,8 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { parametriAnno } from '../js/fiscal/params/index.js';
-import { calcolaScadenzario, prossimoLavorativo, eFestivo } from '../js/fiscal/scadenzario.js';
-import { incassiMensili, cumulato } from '../js/domain/serie.js';
+import { calcolaScadenzario, prossimoLavorativo, eFestivo, accontoInpsTotale } from '../js/fiscal/scadenzario.js';
+import { incassiMensili, cumulato, bolloPerTrimestre } from '../js/domain/serie.js';
 import { generaCsv, csvFatture, csvScadenzario } from '../js/export/csv.js';
 
 const p = parametriAnno(2026);
@@ -122,4 +122,50 @@ test('cassa professionale: versamenti manuali', () => {
   const m = v.find((x) => x.id === 'cassa-0');
   assert.equal(m.importo, 1200);
   assert.equal(m.data, '2026-11-02');
+});
+
+test('acconto INPS: Gestione Separata 80% del reddito, IVS 100% dell\'eccedenza (con riduzione 35%)', () => {
+  assert.equal(accontoInpsTotale(p, { tipo: 'gestione-separata' }, 40000), 8342.4);
+  assert.equal(accontoInpsTotale(p, { tipo: 'artigiani' }, 30000), 2686.08);          // (30.000 − 18.808) × 24%
+  assert.equal(accontoInpsTotale(p, { tipo: 'commercianti' }, 30000), 2739.8);        // × 24,48%
+  assert.equal(accontoInpsTotale(p, { tipo: 'artigiani', riduzione35: true }, 30000), 1745.95); // × 0,65
+  assert.equal(accontoInpsTotale(p, { tipo: 'artigiani' }, 10000), 0);                // sotto il minimale
+  assert.equal(accontoInpsTotale(p, { tipo: 'cassa' }, 50000), 0);
+});
+
+test('scadenzario IVS: acconto in due rate uguali sul reddito dell\'anno precedente', () => {
+  const v = calcolaScadenzario(p, { ...base, previdenza: { tipo: 'artigiani' }, redditoAnnoPrec: 30000, contributiAnnoPrec: { totale: 7207.44, fisso: 4521.36 }, accontiInpsVersati: 0 });
+  const a1 = v.find((x) => x.id === 'inps-acc1'), a2 = v.find((x) => x.id === 'inps-acc2');
+  assert.equal(a1.importo, 1343.04);
+  assert.equal(a2.importo, 1343.04);
+  assert.equal(a1.causaleInps, 'AP');
+  assert.equal(v.find((x) => x.id === 'inps-saldo').importo, 2686.08);   // eccedenza dell'anno precedente, nessun acconto versato
+});
+
+test('bollo: somma per trimestre di emissione', () => {
+  const f = [
+    { clienteId: 'c', data: '2026-01-10', bollo: 2 }, { clienteId: 'c', data: '2026-03-31', bollo: 2 },
+    { clienteId: 'c', data: '2026-04-01', bollo: 2 }, { clienteId: 'c', data: '2026-12-31', bollo: 2 },
+    { clienteId: 'c', data: '2026-05-01', bollo: 0 }, { clienteId: 'x', data: '2026-05-01', bollo: 2 },
+  ];
+  assert.deepEqual(bolloPerTrimestre(f, 'c', 2026), [4, 2, 0, 2]);
+});
+
+test('scadenzario: bollo trimestrale con differimento e codici 2521-2524', () => {
+  const b = { precQ4: 10, q: [20, 30, 40] };
+  const v = calcolaScadenzario(p, { ...base, bollo: b });
+  const per = (id) => v.find((x) => x.id === id);
+  assert.equal(per('bollo-q4').data, '2026-03-02');
+  assert.equal(per('bollo-q4').codiceTributo, '2524');
+  assert.equal(per('bollo-q4').importo, 10);
+  // Q1+Q2 <= 5.000 €: Q1 e Q2 slittano al 30/11
+  assert.equal(per('bollo-q1').data, '2026-11-30');
+  assert.equal(per('bollo-q1').codiceTributo, '2521');
+  assert.equal(per('bollo-q2').data, '2026-11-30');
+  assert.equal(per('bollo-q2').codiceTributo, '2522');
+  assert.equal(per('bollo-q3').data, '2026-11-30');
+  assert.equal(per('bollo-q3').codiceTributo, '2523');
+  const w = calcolaScadenzario(p, { ...base, bollo: b, bolloDifferito: false });
+  assert.equal(w.find((x) => x.id === 'bollo-q1').data, '2026-06-01');
+  assert.equal(w.find((x) => x.id === 'bollo-q2').data, '2026-09-30');
 });

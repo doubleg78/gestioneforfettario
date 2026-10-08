@@ -12,7 +12,7 @@ const svg = (tag, attrs = {}, ...figli) => {
 };
 const testo = (x, y, t, attrs = {}) => { const el = svg('text', { x, y, ...attrs }); el.textContent = t; return el; };
 
-const L = 520, A = 250, M = { sx: 64, dx: 16, su: 16, giu: 32 };
+const L = 560, A = 260, M = { sx: 64, dx: 16, su: 16, giu: 32 };
 const w = L - M.sx - M.dx, hh = A - M.su - M.giu;
 
 /** Estremo "bello" per l'asse y e passo dei tick. */
@@ -52,7 +52,7 @@ function assiEGriglia(cima, passo, formatoY) {
 
 function tabella(intestazioni, righe) {
   return h('details', { classe: 'vista-tabella' }, h('summary', null, 'Mostra come tabella'),
-    h('div', { classe: 'tabella-contenitore' }, h('table', null,
+    h('div', { classe: 'tabella-contenitore' }, h('table', { classe: 'tabella' },
       h('thead', null, h('tr', null, intestazioni.map((t, i) => h('th', { classe: i ? 'numero' : null }, t)))),
       h('tbody', null, righe.map((r) => h('tr', null, r.map((c, i) => h('td', { classe: i ? 'numero' : null }, c))))))));
 }

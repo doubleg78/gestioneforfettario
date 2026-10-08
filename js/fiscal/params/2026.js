@@ -14,13 +14,20 @@ export default {
       alertPercentuale: 0.9,          // soglia di preallarme (scelta dell'app, non di legge)
     },
     aliquote: { ordinaria: 0.15, startup: 0.05, anniStartup: 5 },
-    bollo: { sogliaImporto: 77.47, importo: 2 },
+    // VERIFICATO: AdE, guida "L'imposta di bollo sulle fatture elettroniche" (giugno 2026) e Circ. 19/E 2020.
+    // Versamento trimestrale con F24 (codici 2521-2524): 31/5, 30/9, 30/11, 28/2; slittamenti a 30/9 e 30/11
+    // se l'importo dovuto per il primo trimestre, o per i primi due, non supera 5.000 €.
+    bollo: {
+      sogliaImporto: 77.47, importo: 2,
+      trimestri: { codici: ['2521', '2522', '2523', '2524'], scadenze: ['05-31', '09-30', '11-30', '02-28'], sogliaDifferimento: 5000 },
+    },
     // VERIFICATO su Normattiva: L. 190/2014 art. 1 c. 77 (contribuzione ridotta del 35%,
     // solo gestioni artigiani/commercianti L. 233/1990; richiesta all'INPS)
     riduzioneContributiIvs: 0.35,
     // Acconto: 100% dell'imposta dell'anno precedente (metodo storico), 2 rate.
-    // Ripartizione 50% + 50% (confermata dall'utente per i forfettari; art. 58 DL 124/2019 per i soggetti ISA).
-    // Il testo letterale (c. 64 + art. 17 DPR 435/2001) porterebbe a 40% + 60%: v. BRIEFING.md.
+    // VERIFICATO: 50% + 50% per i forfettari con attività per cui è approvato un ISA e ricavi entro il limite ISA
+    // (AdE, risoluzione 93/E del 12/11/2019, che estende l'art. 58 DL 124/2019 all'imposta sostitutiva);
+    // negli altri casi 40% + 60% (art. 17 c. 3 DPR 435/2001).
     acconto: { sogliaMinima: 51.65, sogliaRataUnica: 257.52, percentualeRata1: 0.5 },
     // Codici tributo F24 (Risoluzione AdE 59/E del 11/6/2015)
     codiciTributo: { accontoPrimaRata: '1790', accontoSecondaRataOUnica: '1791', saldo: '1792' },
@@ -74,10 +81,12 @@ export default {
     // 122.295 per chi è iscritto dal 1/1/1996 (non frazionabile).
     massimale: { ante1996: 93707, dal1996: 122295 },
     contributoMaternitaAnnuo: 7.44, // 0,62 €/mese
-    // Acconti sulla quota eccedente il minimale: 80% in due rate uguali (stesse scadenze IRPEF).
-    // L'INPS (circ. 14/2026, p. 9) prevede saldo, primo e secondo acconto; la misura dell'80% non è
-    // riportata nelle circolari lette: da confermare nel Cassetto previdenziale ("Dati del mod. F24").
-    acconto: { percentuale: 0.8, rate: 2, daVerificare: true },
+    // Acconti sulla quota eccedente il minimale: due rate di pari importo alle scadenze IRPEF, calcolati sul
+    // reddito d'impresa dell'anno precedente con le aliquote dell'anno (INPS, scheda "Aliquote e contributi
+    // artigiani"; per i forfettari importo "ordinariamente determinato e poi ridotto del 35%").
+    // La misura (100% = 50% + 50%) è desunta da esempi di prassi (Fiscoetasse); gli importi ufficiali sono
+    // nel Cassetto previdenziale ("Dati del mod. F24").
+    acconto: { percentuale: 1, rate: 2, daVerificare: true },
     // Rate dei contributi sul minimale (circ. INPS 14/2026 p. 9: 18/5 [16/5 è sabato], 20/8, 16/11, 16/2/2027)
     scadenzeFissi: ['05-16', '08-20', '11-16', '02-16'],
     // Causali F24: AF/CF minimale, AP/CP quota eccedente (pagina INPS "F24 per artigiani e commercianti")
@@ -95,7 +104,7 @@ export default {
       { fino: Infinity, aliquota: 0.43 },
     ],
     // Detrazione per redditi di lavoro autonomo, art. 13 c. 5 e 5-ter TUIR (non cumulabile con quelle dei c. 1-4).
-    // Fonte: testo del TUIR riportato da Brocardi/Lexplain (non da Normattiva).
+    // VERIFICATO: AdE, specifiche tecniche Redditi PF 2026 (rigo RN7, par. 21.4), quoziente troncato a 4 decimali.
     detrazioneLavoroAutonomo: {
       importoFisso: 1265, finoA: 5500,
       base: 500, extra: 765, finoA2: 28000, divisore: 22500,

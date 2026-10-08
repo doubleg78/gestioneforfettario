@@ -14,3 +14,13 @@ export function cumulato(valori) {
   let t = 0;
   return valori.map((v) => (t = round2(t + v)));
 }
+
+/** Somma del bollo delle fatture emesse in ciascun trimestre solare dell'anno (per data di emissione). */
+export function bolloPerTrimestre(fatture, clienteId, anno) {
+  const q = [0, 0, 0, 0];
+  for (const f of fatture) {
+    if (f.clienteId !== clienteId || !f.bollo || !f.data.startsWith(String(anno))) continue;
+    q[Math.floor((Number(f.data.slice(5, 7)) - 1) / 3)] += f.bollo;
+  }
+  return q.map(round2);
+}

@@ -20,7 +20,14 @@ export function ricaviPerAteco(cliente, fatture, annoRif, params) {
   return voci.length ? voci : [senzaAteco];
 }
 
-export function riepilogoAnno(cliente, dati, annoRif, params) {
+/**
+ * Riepilogo dell'anno d'imposta.
+ * I contributi previdenziali si deducono nell'anno in cui sono versati (art. 1 c. 64 L. 190/2014):
+ * se non è registrato l'importo versato, si stima con i contributi di competenza dell'anno precedente
+ * (saldo + acconti dell'anno ≈ contributi dell'anno prima). Con `opzioni.paramsPrec` la stima è attiva.
+ * @param {{paramsPrec?: object, senzaStima?: boolean}} [opzioni]
+ */
+export function riepilogoAnno(cliente, dati, annoRif, params, opzioni = {}) {
   const perAteco = ricaviPerAteco(cliente, dati.fatture, annoRif, params);
   const ricavi = round2(perAteco.reduce((s, v) => s + v.importo, 0));
   const daIncassare = round2(dati.fatture
@@ -30,11 +37,25 @@ export function riepilogoAnno(cliente, dati, annoRif, params) {
   const soglie = verificaSoglieRicavi(params, ricavi);
   const alq = aliquotaSostitutiva(params, { annoInizioAttivita: cliente.annoInizioAttivita, requisitiStartup: cliente.startup, annoImposta: annoRif });
   const senzaCoefficienti = perAteco.some((v) => v.importo > 0 && !v.coefficiente);
-  const forfettario = senzaCoefficienti ? null : calcolaForfettario(params, {
+  const datiForf = {
     ricavi: perAteco.filter((v) => v.importo !== 0).map((v) => ({ importo: v.importo, coefficiente: v.coefficiente })),
     previdenza: cliente.previdenza,
     aliquota: alq.aliquota,
     riduzione35: cliente.previdenza.riduzione35,
-  });
-  return { annoRif, perAteco, ricavi, daIncassare, spese, soglie, aliquota: alq, forfettario };
+  };
+  let forfettario = senzaCoefficienti ? null : calcolaForfettario(params, datiForf);
+
+  // Contributi dedotti per cassa: registrati, stimati dall'anno precedente, o (senza dati) di competenza
+  let deduzione = { metodo: 'competenza', importo: forfettario?.contributi.totale ?? 0 };
+  const registrati = cliente.versamenti?.[annoRif]?.contributiVersatiAnno;
+  if (forfettario && Number.isFinite(registrati)) {
+    deduzione = { metodo: 'registrati', importo: registrati };
+  } else if (forfettario && opzioni.paramsPrec && !opzioni.senzaStima) {
+    const prec = riepilogoAnno(cliente, dati, annoRif - 1, opzioni.paramsPrec, { senzaStima: true });
+    deduzione = { metodo: 'stima', importo: prec.forfettario?.contributi.totale ?? 0 };
+  }
+  if (forfettario && deduzione.metodo !== 'competenza') {
+    forfettario = calcolaForfettario(params, { ...datiForf, contributiVersati: deduzione.importo });
+  }
+  return { annoRif, perAteco, ricavi, daIncassare, spese, soglie, aliquota: alq, forfettario, deduzione };
 }

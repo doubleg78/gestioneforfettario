@@ -1,0 +1,27 @@
+.grafico { position: relative; margin: 0; }
+.grafico figcaption { margin-bottom: 10px; display: flex; flex-direction: column; gap: 2px; }
+.grafico figcaption strong { font-size: 14px; font-weight: 650; }
+.grafico figcaption .tenue { color: var(--muted); font-size: 13px; }
+.grafico svg { width: 100%; height: auto; display: block; overflow: visible; }
+.grafico .griglia { stroke: var(--griglia); stroke-width: 1; }
+.grafico .asse { stroke: var(--asse); stroke-width: 1; }
+.grafico .tick { fill: var(--tick); font-size: 12px; font-variant-numeric: tabular-nums; }
+.grafico .colonna { fill: var(--serie-1); transition: opacity .1s; }
+.grafico .colonna.attiva { opacity: .72; }
+.grafico .bersaglio { fill: transparent; outline: none; }
+.grafico .bersaglio:focus-visible { stroke: var(--focus); stroke-width: 2; }
+.grafico .linea { fill: none; stroke-width: 2.25; stroke-linecap: round; stroke-linejoin: round; }
+.grafico .punto { stroke: var(--card); stroke-width: 2; }
+.grafico .guida { stroke: var(--asse); stroke-width: 1; }
+.grafico .riferimento { stroke: var(--riferimento); stroke-width: 1; stroke-dasharray: 4 3; }
+.grafico .etichetta-rif { fill: var(--tick); font-size: 12px; }
+.legenda { display: flex; gap: 18px; list-style: none; margin: 0 0 10px; padding: 0; font-size: 13px; }
+.legenda li { display: flex; align-items: center; gap: 7px; }
+.chiave { display: inline-block; width: 14px; height: 3px; border-radius: 2px; }
+.tooltip { position: absolute; z-index: 5; pointer-events: none; background: var(--card); border: 1px solid var(--line-forte); border-radius: 8px; padding: 7px 11px; box-shadow: var(--ombra-overlay); white-space: nowrap; }
+.tooltip[hidden] { display: none; }
+.tip-valore { font-weight: 650; font-variant-numeric: tabular-nums; }
+.tip-etichetta { color: var(--muted); font-size: 12.5px; }
+.tip-riga { display: flex; align-items: center; gap: 8px; }
+.vista-tabella { margin-top: 10px; font-size: 13px; }
+.vista-tabella summary { cursor: pointer; color: var(--muted); }

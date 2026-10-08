@@ -1,5 +1,6 @@
 import { round2, clamp0 } from './utils.js';
 import { accontiSostitutiva } from './acconti.js';
+import { contributiIvs } from './inps.js';
 
 // --- Calendario: scadenze che cadono di sabato, domenica o festivo slittano al primo giorno lavorativo ---
 
@@ -33,6 +34,26 @@ export function prossimoLavorativo(isoData) {
 const scadenza = (anno, mmgg) => prossimoLavorativo(`${anno}-${mmgg}`);
 
 /**
+ * Acconto complessivo dei contributi INPS per l'anno dei parametri, calcolato sul reddito dell'anno precedente.
+ * - Gestione Separata: aliquota dell'anno sull'80% del reddito (istruzioni Redditi PF), nel limite del massimale.
+ * - Artigiani/commercianti: contributi sulla sola quota eccedente il minimale, ridotti del 35% se dovuto.
+ */
+export function accontoInpsTotale(params, previdenza, redditoPrec) {
+  const reddito = clamp0(redditoPrec ?? 0);
+  if (previdenza.tipo === 'gestione-separata') {
+    const gs = params.gestioneSeparata;
+    const aliquota = previdenza.altraCopertura ? gs.aliquotaConAltraCopertura : gs.aliquotaProfessionistaSenzaCopertura;
+    return round2(Math.min(reddito, gs.massimale) * gs.acconto.percentuale * aliquota);
+  }
+  if (previdenza.tipo === 'artigiani' || previdenza.tipo === 'commercianti') {
+    const r = previdenza.riduzione35 ? 1 - params.forfettario.riduzioneContributiIvs : 1;
+    const c = contributiIvs(reddito, params, previdenza.tipo, { iscrittoDal1996: previdenza.iscrittoDal1996 ?? true });
+    return round2(c.eccedenza * r * params.ivs.acconto.percentuale);
+  }
+  return 0;
+}
+
+/**
  * Scadenzario dei versamenti dell'anno `annoPagamento` (imposta sostitutiva e INPS).
  * Saldo e primo acconto riguardano i redditi dell'anno precedente.
  *
@@ -44,8 +65,10 @@ const scadenza = (anno, mmgg) => prossimoLavorativo(`${anno}-${mmgg}`);
  * @param {number} d.accontiInpsVersati acconti INPS (eccedenza) già versati per l'anno precedente
  * @param {object} d.previdenza
  * @param {boolean} [d.prorogaEstate2026] applica la proroga del 20 luglio
- * @param {number} [d.redditoAnnoPrec] reddito dell'anno precedente (base dell'acconto Gestione Separata)
+ * @param {number} [d.redditoAnnoPrec] reddito dell'anno precedente (base degli acconti INPS)
  * @param {number} [d.percentualeRata1] quota della prima rata di acconto dell'imposta sostitutiva (0,4 o 0,5)
+ * @param {{precQ4:number, q:number[]}} [d.bollo] bollo dovuto sulle fatture: quarto trimestre dell'anno precedente e primi tre dell'anno
+ * @param {boolean} [d.bolloDifferito] usa il differimento consentito (30/9 o 30/11) quando l'importo è sotto 5.000 €
  * @param {{data:string, descrizione:string, importo:number, nota?:string}[]} [d.scadenzeManuali] versamenti inseriti dall'utente (casse professionali)
  */
 export function calcolaScadenzario(params, d) {
@@ -68,6 +91,21 @@ export function calcolaScadenzario(params, d) {
     descrizione: acc.prima > 0 ? `Secondo acconto imposta sostitutiva ${P}` : `Acconto in unica soluzione imposta sostitutiva ${P}`,
     importo: acc.seconda, codiceTributo: fp.codiciTributo.accontoSecondaRataOUnica, annoRiferimento: P, nota: 'Metodo storico' });
 
+  // Bollo sulle fatture elettroniche (versamento trimestrale)
+  if (d.bollo) {
+    const b = fp.bollo.trimestri;
+    const [q1, q2, q3] = d.bollo.q;
+    const differisci = d.bolloDifferito !== false;
+    let dataQ1 = scadenza(P, b.scadenze[0]), dataQ2 = scadenza(P, b.scadenze[1]);
+    if (differisci && q1 + q2 <= b.sogliaDifferimento) dataQ1 = dataQ2 = scadenza(P, b.scadenze[2]);
+    else if (differisci && q1 <= b.sogliaDifferimento) dataQ1 = dataQ2;
+    const bolloVoce = (id, trimestre, anno, data, importo) => importo > 0 && voci.push({ id, tipo: 'imposta', data, descrizione: `Imposta di bollo sulle fatture, ${trimestre}° trimestre ${anno}`, importo: round2(importo), codiceTributo: b.codici[trimestre - 1], annoRiferimento: anno, nota: 'Versamento con F24 (bollo su fatture elettroniche)' });
+    bolloVoce('bollo-q4', 4, P - 1, scadenza(P, b.scadenze[3]), d.bollo.precQ4);
+    bolloVoce('bollo-q1', 1, P, dataQ1, q1);
+    bolloVoce('bollo-q2', 2, P, dataQ2, q2);
+    bolloVoce('bollo-q3', 3, P, scadenza(P, b.scadenze[2]), q3);
+  }
+
   // INPS
   const prev = d.previdenza;
   const inps = d.contributiAnnoPrec;
@@ -77,9 +115,7 @@ export function calcolaScadenzario(params, d) {
     const aliquota = prev.altraCopertura ? gs.aliquotaConAltraCopertura : gs.aliquotaProfessionistaSenzaCopertura;
     const causale = prev.altraCopertura ? gs.causaliF24.altraCopertura : gs.causaliF24.standard;
     const saldoInps = round2(inps.totale - d.accontiInpsVersati);
-    // Acconti: aliquota dell'anno corrente sull'80% del reddito dell'anno precedente, nel limite del massimale
-    const baseAcc = Math.min(clamp0(d.redditoAnnoPrec ?? inps.totale / aliquota), gs.massimale) * a.percentuale;
-    const totaleAcc = round2(baseAcc * aliquota);
+    const totaleAcc = accontoInpsTotale(params, prev, d.redditoAnnoPrec ?? inps.totale / aliquota);
     const rata1 = round2(totaleAcc / a.rate);
     const rata2 = round2(totaleAcc - rata1);
     voci.push({ id: 'inps-saldo', tipo: 'inps', data: dataGiugno, descrizione: `Saldo contributi Gestione Separata ${P - 1}`, importo: clamp0(saldoInps), annoRiferimento: P - 1, causaleInps: causale,
@@ -88,19 +124,22 @@ export function calcolaScadenzario(params, d) {
     voci.push({ id: 'inps-acc2', tipo: 'inps', data: dataNovembre, descrizione: `Secondo acconto contributi Gestione Separata ${P}`, importo: rata2, annoRiferimento: P, causaleInps: causale, nota: 'Seconda rata di pari importo' });
   } else if (prev.tipo === 'artigiani' || prev.tipo === 'commercianti') {
     const ivs = params.ivs;
-    const fisso = d.contributiFissiAnno ?? round2((ivs.minimale * ivs.aliquote[prev.tipo] + ivs.contributoMaternitaAnnuo) * (prev.riduzione35 ? 1 - fp.riduzioneContributiIvs : 1));
+    const riduzione = prev.riduzione35 ? 1 - fp.riduzioneContributiIvs : 1;
+    const fisso = d.contributiFissiAnno ?? round2((ivs.minimale * ivs.aliquote[prev.tipo] + ivs.contributoMaternitaAnnuo) * riduzione);
     ivs.scadenzeFissi.forEach((mmgg, i) => {
       const anno = mmgg === '02-16' ? P + 1 : P;
       voci.push({ id: `inps-fisso-${i + 1}`, tipo: 'inps', data: scadenza(anno, mmgg), descrizione: `Contributi fissi IVS ${P}, rata ${i + 1} di 4`, importo: round2(fisso / 4), annoRiferimento: P, causaleInps: ivs.causaliF24[prev.tipo].minimale, nota: 'Versamento con F24 INPS' });
     });
-    const fissoPrec = d.contributiFissiAnnoPrec ?? fisso;
+    const fissoPrec = d.contributiFissiAnnoPrec ?? (inps.fisso !== undefined ? round2(inps.fisso * riduzione) : fisso);
     const eccedenzaPrec = clamp0(round2(inps.totale - fissoPrec));
     const saldoEcc = round2(eccedenzaPrec - d.accontiInpsVersati);
-    const rataEcc = round2(eccedenzaPrec * ivs.acconto.percentuale / ivs.acconto.rate);
+    const totaleAcc = accontoInpsTotale(params, prev, d.redditoAnnoPrec ?? 0);
+    const rataEcc = round2(totaleAcc / ivs.acconto.rate);
     voci.push({ id: 'inps-saldo', tipo: 'inps', data: dataGiugno, descrizione: `Saldo contributi sul reddito eccedente il minimale ${P - 1}`, importo: clamp0(saldoEcc), annoRiferimento: P - 1, causaleInps: ivs.causaliF24[prev.tipo].eccedenza, nota: saldoEcc < 0 ? 'Credito' : '' });
     if (rataEcc > 0) {
-      voci.push({ id: 'inps-acc1', tipo: 'inps', data: dataGiugno, descrizione: `Primo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, causaleInps: ivs.causaliF24[prev.tipo].eccedenza, nota: 'Misura dell’acconto (80%) da confermare nel Cassetto previdenziale' });
-      voci.push({ id: 'inps-acc2', tipo: 'inps', data: dataNovembre, descrizione: `Secondo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, causaleInps: ivs.causaliF24[prev.tipo].eccedenza, nota: 'Misura dell’acconto (80%) da confermare nel Cassetto previdenziale' });
+      const nota = 'Due rate uguali sul reddito dell’anno precedente: importi ufficiali nel Cassetto previdenziale INPS';
+      voci.push({ id: 'inps-acc1', tipo: 'inps', data: dataGiugno, descrizione: `Primo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, causaleInps: ivs.causaliF24[prev.tipo].eccedenza, nota });
+      voci.push({ id: 'inps-acc2', tipo: 'inps', data: dataNovembre, descrizione: `Secondo acconto contributi sul reddito eccedente ${P}`, importo: round2(totaleAcc - rataEcc), annoRiferimento: P, causaleInps: ivs.causaliF24[prev.tipo].eccedenza, nota });
     }
   } else {
     const manuali = d.scadenzeManuali ?? [];

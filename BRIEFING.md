@@ -121,3 +121,27 @@ Fatto:
 | PDF | Resta "Stampa / PDF" del browser | — |
 
 Ancora fuori perimetro: IVA, ammortamenti, deduzioni diverse dai contributi, limiti IRAP per professionisti, tabella dati per cassa, conversione ATECO non univoca (l'app fa scegliere all'utente).
+
+## Fase 4: interfaccia rifatta, demo, PDF, bollo
+
+Interfaccia riprogettata da zero (la richiesta ammetteva di discostarsi dal brand: app pensata per una demo): palette teal, sidebar scura, tema chiaro/scuro/automatico, selettore anno globale, selettore cliente, palette comandi (Ctrl/Cmd+K), drawer per i moduli, tabelle ordinabili, grafici SVG accessibili (tastiera + vista tabella), layout mobile. Palette dei grafici validata con lo script dataviz.
+
+Novità funzionali:
+- **Studio multi-cliente**: panoramica, elenco clienti, agenda scadenze di tutto lo studio, segnalazione soglie 85.000 € / 100.000 € e requisiti.
+- **Dati di esempio**: 7 clienti fittizi caricabili alla creazione dell'archivio o da Impostazioni.
+- **PDF veri** (simulazione, scadenzario, riepilogo, agenda) con intestazione dello studio: jsPDF 4.0.0 e AutoTable 5.0.7 caricati da cdnjs con SRI al primo uso. Senza rete l'app ricade su "Stampa / PDF" del browser.
+- **Scadenze segnabili come pagate**, base di calcolo consultabile, versamenti manuali per le casse.
+- **Pagina Parametri** con fonti e stato di verifica di ogni valore.
+- **Ricerca ATECO 2025** con titoli ISTAT e raccordo al 2022.
+- **Bollo sulle fatture elettroniche**: versamento trimestrale con codici F24 2521–2524 (31/5, 30/9, 30/11, 28/2 successivo), con differimento al 30/9 o 30/11 se il primo (o primo+secondo) trimestre è ≤ 5.000 € (guida AdE, giugno 2026).
+
+Esiti delle verifiche:
+- Acconti imposta sostitutiva: **50% + 50% confermato**, coerente con la Risoluzione AdE 93/E del 12/11/2019 (soggetti con attività ISA). Il 40/60 resta selezionabile.
+- Bollo, scaglioni IRPEF 2026 (23/33/43%) e IRAP 3,9%: verificati su fonti AdE.
+- Soglia 35.000 € per il 2025–2026 (L. 199/2025 c. 27) e conversione ATECO (D.Lgs. 81/2025 art. 1): verificate.
+
+Ancora aperto:
+- Acconti IVS sull'eccedenza: assunto 100% in due rate uguali; gli importi ufficiali sono nel Cassetto previdenziale INPS.
+- Testo dell'art. 6 DL 89/2026 non letto direttamente (riguarda solo scadenze 2026 già passate).
+- Scadenze del regime ordinario segnalate come "parziali".
+- Le date di differimento del bollo sono applicate in automatico: verificare caso per caso.

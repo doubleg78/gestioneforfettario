@@ -8,6 +8,8 @@
     "build": "esbuild js/app.js --bundle --format=iife --target=es2020 --outfile=dist/app.js --log-level=warning"
   },
   "devDependencies": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "jspdf": "^4.0.0",
+    "jspdf-autotable": "^5.0.7"
   }
 }

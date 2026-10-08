@@ -224,13 +224,13 @@ test('ATECO 2025 -> coefficiente tramite raccordo ISTAT', () => {
 test('detrazione lavoro autonomo (art. 13 c. 5 e 5-ter TUIR)', () => {
   assert.equal(detrazioneLavoroAutonomo(4000, p), 1265);
   assert.equal(detrazioneLavoroAutonomo(5500, p), 1265);
-  assert.equal(detrazioneLavoroAutonomo(15000, p), 992);   // 500 + 765*13.000/22.500 + 50 (fascia 11.000-17.000)
+  assert.equal(detrazioneLavoroAutonomo(15000, p), 991.94);   // 500 + 765*0,5777 + 50: quoziente troncato a 4 decimali
   assert.equal(detrazioneLavoroAutonomo(28000, p), 500);
   assert.equal(detrazioneLavoroAutonomo(39000, p), 250);   // 500 * 11.000 / 22.000
   assert.equal(detrazioneLavoroAutonomo(50000, p), 0);
   assert.equal(detrazioneLavoroAutonomo(80000, p), 0);
-  assert.equal(detrazioneLavoroAutonomo(11000, p), 1078);   // 500 + 765*17.000/22.500, senza i 50 € (solo oltre 11.000)
-  assert.equal(detrazioneLavoroAutonomo(17000, p), 924);    // 500 + 765*11.000/22.500 + 50
+  assert.equal(detrazioneLavoroAutonomo(11000, p), 1077.96);   // 500 + 765*0,7555, senza i 50 € (solo oltre 11.000)
+  assert.equal(detrazioneLavoroAutonomo(17000, p), 923.93);    // 500 + 765*0,4888 + 50
 });
 
 test('ordinario: detrazione automatica, altre detrazioni e perdite pregresse', () => {
