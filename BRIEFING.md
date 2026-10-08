@@ -55,14 +55,12 @@ tests/          test del motore di calcolo (pagina HTML o Node)
 ## Piano di sviluppo
 
 1. **Motore di calcolo** (logica pura + parametri per anno + test). Tutti i parametri vanno verificati su fonti ufficiali (Normattiva, Agenzia Entrate, INPS) prima di essere fissati.
-2. **Interfaccia e dati**: struttura, sidebar, storage cifrato, anagrafica, fatture, spese, import.
+2. **Interfaccia e dati** (fatta): sidebar con selettore cliente, archivio cifrato in IndexedDB con backup, anagrafica, fatture (manuale, CSV, XML FatturaPA), spese, riepilogo annuale.
 3. **Simulazione, controlli, scadenzario, output e dashboard.**
 
-## Punti aperti da verificare in fase 1
+## Fase 1 completata
 
-- Parametri 2025/2026: aliquote Gestione Separata, minimali e contributi IVS, scaglioni IRPEF, addizionali, soglie di esclusione.
-- Gestione dei contribuenti con casse professionali proprie (serve una tabella parametrizzata per cassa).
-- Regole di acconto e saldo, e codici tributo F24 aggiornati.
+Motore di calcolo in `js/fiscal/`, parametri 2026 verificati (v. sotto). Le casse professionali usano un'aliquota soggettiva inserita dall'utente: manca una tabella per cassa.
 
 ## Stato delle verifiche normative (parametri 2026)
 
@@ -84,3 +82,14 @@ tests/          test del motore di calcolo (pagina HTML o Node)
 
 - Testo dell'art. 6 DL 89/2026 e verifica che la L. 113/2026 non lo riscriva: riguarda solo l'anno 2026 (scadenze già passate).
 - Verifica che i gruppi per codici ATECO 2022 coincidano con la tabella AdE vigente (usata la classificazione dell'Allegato 4 per divisione/gruppo).
+
+## Fase 2: cosa c'è e cosa no
+
+Fatto: archivio cifrato (`js/storage/`), import CSV/XML (`js/import/`), riepilogo con criterio di cassa (`js/domain/`), viste (`js/ui/`).
+Provato nel browser con Chromium: creazione archivio, cliente con ATECO 2025, fattura, import CSV, riepilogo, backup, blocco/sblocco con password errata, persistenza dopo reload, layout mobile.
+
+Limiti noti:
+- Un solo anno di parametri (2026): il riepilogo usa sempre i parametri 2026, anche per anni diversi.
+- Le fatture XML non portano la data di incasso: va inserita a mano.
+- I contributi del riepilogo sono quelli di competenza, non quelli effettivamente versati nell'anno.
+- Il cambio password non è ancora previsto (workaround: backup, nuovo archivio, ripristino).
