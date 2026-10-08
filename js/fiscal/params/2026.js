@@ -56,6 +56,8 @@ export default {
     aliquotaConAltraCopertura: 0.24,
     minimale: 18808,
     massimale: 122295,
+    // Acconto: 80% dei contributi dell'anno precedente in due rate uguali (40% + 40%). Regola da verificare.
+    acconto: { percentuale: 0.8, rate: 2, daVerificare: true },
   },
 
   // VERIFICATO su INPS: circolare n. 14 del 9/2/2026 (aliquote, minimale, maggiorazione e massimale
@@ -68,6 +70,9 @@ export default {
     // 122.295 per chi è iscritto dal 1/1/1996 (non frazionabile).
     massimale: { ante1996: 93707, dal1996: 122295 },
     contributoMaternitaAnnuo: 7.44, // 0,62 €/mese
+    acconto: { percentuale: 0.8, rate: 2, daVerificare: true },
+    // Rate dei contributi fissi (circ. INPS 14/2026): 18/5, 20/8, 17/11 dell'anno e 16/2 dell'anno successivo
+    scadenzeFissi: ['05-18', '08-20', '11-17', '02-16'],
   },
 
   // Casse professionali: i parametri variano per cassa, vengono inseriti dall'utente.

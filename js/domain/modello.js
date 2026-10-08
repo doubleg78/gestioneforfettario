@@ -19,6 +19,7 @@ export function nuovoCliente() {
     ateco: [],
     previdenza: { tipo: 'gestione-separata', altraCopertura: false, iscrittoDal1996: true, riduzione35: false, cassa: { aliquotaSoggettiva: 0.1, contributoMinimo: 0 } },
     startup: false,
+    versamenti: {}, // per anno d'imposta: { sostitutiva, inps } acconti già versati
     note: '',
   };
 }

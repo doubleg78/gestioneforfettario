@@ -1,0 +1,102 @@
+import { round2, clamp0 } from './utils.js';
+import { accontiSostitutiva } from './acconti.js';
+
+// --- Calendario: scadenze che cadono di sabato, domenica o festivo slittano al primo giorno lavorativo ---
+
+function pasqua(anno) {
+  const a = anno % 19, b = Math.floor(anno / 100), c = anno % 100;
+  const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+  const h = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+  const l = (32 + 2 * e + 2 * i - h - k) % 7, m = Math.floor((a + 11 * h + 22 * l) / 451);
+  const mese = Math.floor((h + l - 7 * m + 114) / 31), giorno = ((h + l - 7 * m + 114) % 31) + 1;
+  return new Date(Date.UTC(anno, mese - 1, giorno));
+}
+
+const FESTIVI_FISSI = ['01-01', '01-06', '04-25', '05-01', '06-02', '08-15', '11-01', '12-08', '12-25', '12-26'];
+const iso = (d) => d.toISOString().slice(0, 10);
+
+export function eFestivo(isoData) {
+  const d = new Date(`${isoData}T00:00:00Z`);
+  const g = d.getUTCDay();
+  if (g === 0 || g === 6) return true;
+  if (FESTIVI_FISSI.includes(isoData.slice(5))) return true;
+  const lunediAngelo = new Date(pasqua(d.getUTCFullYear()).getTime() + 86400000);
+  return iso(lunediAngelo) === isoData;
+}
+
+export function prossimoLavorativo(isoData) {
+  let d = new Date(`${isoData}T00:00:00Z`);
+  while (eFestivo(iso(d))) d = new Date(d.getTime() + 86400000);
+  return iso(d);
+}
+
+const scadenza = (anno, mmgg) => prossimoLavorativo(`${anno}-${mmgg}`);
+
+/**
+ * Scadenzario dei versamenti dell'anno `annoPagamento` (imposta sostitutiva e INPS).
+ * Saldo e primo acconto riguardano i redditi dell'anno precedente.
+ *
+ * @param {object} d
+ * @param {number} d.annoPagamento
+ * @param {number} d.impostaAnnoPrec imposta sostitutiva dovuta per l'anno precedente
+ * @param {number} d.accontiSostitutivaVersati acconti già versati per l'anno precedente
+ * @param {{totale:number, fisso?:number}} d.contributiAnnoPrec contributi dovuti per l'anno precedente
+ * @param {number} d.accontiInpsVersati acconti INPS (eccedenza) già versati per l'anno precedente
+ * @param {object} d.previdenza
+ * @param {boolean} [d.prorogaEstate2026] applica la proroga del 20 luglio
+ */
+export function calcolaScadenzario(params, d) {
+  const P = d.annoPagamento;
+  const voci = [];
+  const fp = params.forfettario;
+
+  const dataGiugno = d.prorogaEstate2026 && P === 2026 ? scadenza(P, fp.scadenze.saldoEPrimoAccontoProroga2026) : scadenza(P, fp.scadenze.saldoEPrimoAcconto);
+  const dataNovembre = scadenza(P, fp.scadenze.secondoAcconto);
+
+  // Imposta sostitutiva
+  const saldo = round2(d.impostaAnnoPrec - d.accontiSostitutivaVersati);
+  const acc = accontiSostitutiva(params, d.impostaAnnoPrec);
+  voci.push({ id: 'sost-saldo', tipo: 'imposta', data: dataGiugno, descrizione: `Saldo imposta sostitutiva ${P - 1}`,
+    importo: clamp0(saldo), codiceTributo: fp.codiciTributo.saldo, annoRiferimento: P - 1,
+    nota: saldo < 0 ? `Credito di ${Math.abs(saldo).toFixed(2)} € utilizzabile in compensazione` : '' });
+  if (acc.prima > 0) voci.push({ id: 'sost-acc1', tipo: 'imposta', data: dataGiugno, descrizione: `Primo acconto imposta sostitutiva ${P}`,
+    importo: acc.prima, codiceTributo: fp.codiciTributo.accontoPrimaRata, annoRiferimento: P, nota: 'Metodo storico' });
+  if (acc.seconda > 0) voci.push({ id: 'sost-acc2', tipo: 'imposta', data: dataNovembre,
+    descrizione: acc.prima > 0 ? `Secondo acconto imposta sostitutiva ${P}` : `Acconto in unica soluzione imposta sostitutiva ${P}`,
+    importo: acc.seconda, codiceTributo: fp.codiciTributo.accontoSecondaRataOUnica, annoRiferimento: P, nota: 'Metodo storico' });
+
+  // INPS
+  const prev = d.previdenza;
+  const inps = d.contributiAnnoPrec;
+  if (prev.tipo === 'gestione-separata') {
+    const a = params.gestioneSeparata.acconto;
+    const saldoInps = round2(inps.totale - d.accontiInpsVersati);
+    const rata = round2((inps.totale * a.percentuale) / a.rate);
+    voci.push({ id: 'inps-saldo', tipo: 'inps', data: dataGiugno, descrizione: `Saldo contributi Gestione Separata ${P - 1}`, importo: clamp0(saldoInps), annoRiferimento: P - 1,
+      nota: saldoInps < 0 ? 'Credito' : '' });
+    voci.push({ id: 'inps-acc1', tipo: 'inps', data: dataGiugno, descrizione: `Primo acconto contributi Gestione Separata ${P}`, importo: rata, annoRiferimento: P, nota: `${a.percentuale * 100 / a.rate}% dei contributi ${P - 1}` });
+    voci.push({ id: 'inps-acc2', tipo: 'inps', data: dataNovembre, descrizione: `Secondo acconto contributi Gestione Separata ${P}`, importo: rata, annoRiferimento: P, nota: `${a.percentuale * 100 / a.rate}% dei contributi ${P - 1}` });
+  } else if (prev.tipo === 'artigiani' || prev.tipo === 'commercianti') {
+    const ivs = params.ivs;
+    const fisso = d.contributiFissiAnno ?? round2((ivs.minimale * ivs.aliquote[prev.tipo] + ivs.contributoMaternitaAnnuo) * (prev.riduzione35 ? 1 - fp.riduzioneContributiIvs : 1));
+    ivs.scadenzeFissi.forEach((mmgg, i) => {
+      const anno = mmgg === '02-16' ? P + 1 : P;
+      voci.push({ id: `inps-fisso-${i + 1}`, tipo: 'inps', data: scadenza(anno, mmgg), descrizione: `Contributi fissi IVS ${P}, rata ${i + 1} di 4`, importo: round2(fisso / 4), annoRiferimento: P, nota: 'Versamento con F24 INPS' });
+    });
+    const fissoPrec = d.contributiFissiAnnoPrec ?? fisso;
+    const eccedenzaPrec = clamp0(round2(inps.totale - fissoPrec));
+    const saldoEcc = round2(eccedenzaPrec - d.accontiInpsVersati);
+    const rataEcc = round2(eccedenzaPrec * ivs.acconto.percentuale / ivs.acconto.rate);
+    voci.push({ id: 'inps-saldo', tipo: 'inps', data: dataGiugno, descrizione: `Saldo contributi sul reddito eccedente il minimale ${P - 1}`, importo: clamp0(saldoEcc), annoRiferimento: P - 1, nota: saldoEcc < 0 ? 'Credito' : '' });
+    if (rataEcc > 0) {
+      voci.push({ id: 'inps-acc1', tipo: 'inps', data: dataGiugno, descrizione: `Primo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, nota: 'Regola di acconto da verificare' });
+      voci.push({ id: 'inps-acc2', tipo: 'inps', data: dataNovembre, descrizione: `Secondo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, nota: 'Regola di acconto da verificare' });
+    }
+  } else {
+    voci.push({ id: 'inps-cassa', tipo: 'inps', data: null, descrizione: 'Contributi alla cassa professionale', importo: 0, nota: 'Scadenze e importi definiti dalla cassa di appartenenza: non calcolati.' });
+  }
+
+  voci.push({ id: 'dichiarazione', tipo: 'adempimento', data: scadenza(P, fp.scadenze.dichiarazione), descrizione: `Invio dichiarazione dei redditi (anno d'imposta ${P - 1})`, importo: 0, annoRiferimento: P - 1, nota: '' });
+
+  return voci.sort((a, b) => (a.data ?? '9999').localeCompare(b.data ?? '9999') || a.id.localeCompare(b.id));
+}

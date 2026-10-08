@@ -21,15 +21,15 @@
   }
   var eur = new Intl.NumberFormat("it-IT", { style: "currency", currency: "EUR" });
   var euro = (n) => eur.format(n ?? 0);
-  var dataIt = (iso) => iso ? iso.split("-").reverse().join("/") : "";
+  var dataIt = (iso2) => iso2 ? iso2.split("-").reverse().join("/") : "";
   var percentuale = (n) => `${(n * 100).toLocaleString("it-IT", { maximumFractionDigits: 2 })}%`;
   function campo(etichetta, ctrl, nota) {
     const id2 = `c-${Math.random().toString(36).slice(2, 9)}`;
     ctrl.id = id2;
     return h("div", { classe: "campo" }, h("label", { for: id2 }, etichetta), ctrl, nota ? h("small", null, nota) : null);
   }
-  function avviso(tipo, titolo, testo) {
-    return h("div", { classe: `avviso ${tipo}`, role: tipo === "errore" ? "alert" : "status" }, h("strong", null, titolo), testo ? ` ${testo}` : "");
+  function avviso(tipo, titolo, testo2) {
+    return h("div", { classe: `avviso ${tipo}`, role: tipo === "errore" ? "alert" : "status" }, h("strong", null, titolo), testo2 ? ` ${testo2}` : "");
   }
   function selezionaFile(accept, multiplo = false) {
     return new Promise((ok) => {
@@ -268,7 +268,9 @@
       // 25% IVS + 0,72% + 0,35% ISCRO
       aliquotaConAltraCopertura: 0.24,
       minimale: 18808,
-      massimale: 122295
+      massimale: 122295,
+      // Acconto: 80% dei contributi dell'anno precedente in due rate uguali (40% + 40%). Regola da verificare.
+      acconto: { percentuale: 0.8, rate: 2, daVerificare: true }
     },
     // VERIFICATO su INPS: circolare n. 14 del 9/2/2026 (aliquote, minimale, maggiorazione e massimale
     // da risultati di ricerca che citano la circolare; testo integrale non letto per intero).
@@ -280,8 +282,11 @@
       // Circ. INPS 14/2026 p. 4: 93.707 (56.224 + 37.483) per iscritti con anzianità al 31/12/1995;
       // 122.295 per chi è iscritto dal 1/1/1996 (non frazionabile).
       massimale: { ante1996: 93707, dal1996: 122295 },
-      contributoMaternitaAnnuo: 7.44
+      contributoMaternitaAnnuo: 7.44,
       // 0,62 €/mese
+      acconto: { percentuale: 0.8, rate: 2, daVerificare: true },
+      // Rate dei contributi fissi (circ. INPS 14/2026): 18/5, 20/8, 17/11 dell'anno e 16/2 dell'anno successivo
+      scadenzeFissi: ["05-18", "08-20", "11-17", "02-16"]
     },
     // Casse professionali: i parametri variano per cassa, vengono inseriti dall'utente.
     cassa: { predefinita: { aliquotaSoggettiva: 0.1, contributoMinimo: 0 } },
@@ -368,6 +373,8 @@
       ateco: [],
       previdenza: { tipo: "gestione-separata", altraCopertura: false, iscrittoDal1996: true, riduzione35: false, cassa: { aliquotaSoggettiva: 0.1, contributoMinimo: 0 } },
       startup: false,
+      versamenti: {},
+      // per anno d'imposta: { sostitutiva, inps } acconti già versati
       note: ""
     };
   }
@@ -387,6 +394,19 @@
   }
   function clamp0(n) {
     return n > 0 ? n : 0;
+  }
+  function applicaScaglioni(base, scaglioni) {
+    let residuo = clamp0(base);
+    let precedente = 0;
+    let imposta = 0;
+    for (const { fino, aliquota } of scaglioni) {
+      if (residuo <= 0) break;
+      const ampiezza = Math.min(fino - precedente, residuo);
+      imposta += ampiezza * aliquota;
+      residuo -= ampiezza;
+      precedente = fino;
+    }
+    return round2(imposta);
   }
 
   // js/fiscal/requisiti.js
@@ -499,7 +519,7 @@
   }
 
   // js/domain/riepilogo.js
-  var anno = (iso) => iso ? Number(iso.slice(0, 4)) : null;
+  var anno = (iso2) => iso2 ? Number(iso2.slice(0, 4)) : null;
   function fattureIncassateNellAnno(fatture, clienteId, annoRif) {
     return fatture.filter((f) => f.clienteId === clienteId && f.dataIncasso && anno(f.dataIncasso) === annoRif);
   }
@@ -708,7 +728,7 @@
     const { archivio: archivio2, cliente: c, params: params2 } = ctx;
     if (!c) return h("div", null, h("h1", null, "Anagrafica"), avviso("attenzione", "Nessun cliente selezionato.", "Creane uno dalla sezione Clienti."));
     const bozza = structuredClone(c);
-    const testo = (chiave, props = {}) => h("input", { type: "text", valore: bozza[chiave] ?? "", onInput: (e) => {
+    const testo2 = (chiave, props = {}) => h("input", { type: "text", valore: bozza[chiave] ?? "", onInput: (e) => {
       bozza[chiave] = e.target.value;
     }, ...props });
     const selPrev = h(
@@ -849,9 +869,9 @@
         h(
           "div",
           { classe: "griglia" },
-          campo("Nome o ragione sociale", testo("nome", { required: true })),
-          campo("Codice fiscale", testo("codiceFiscale", { maxlength: "16", autocapitalize: "characters" })),
-          campo("Partita IVA", testo("partitaIva", { maxlength: "11", inputmode: "numeric" })),
+          campo("Nome o ragione sociale", testo2("nome", { required: true })),
+          campo("Codice fiscale", testo2("codiceFiscale", { maxlength: "16", autocapitalize: "characters" })),
+          campo("Partita IVA", testo2("partitaIva", { maxlength: "11", inputmode: "numeric" })),
           campo("Anno di inizio attivit\xE0", h("input", { type: "number", min: "1950", max: "2100", valore: bozza.annoInizioAttivita, onInput: (e) => {
             bozza.annoInizioAttivita = Number(e.target.value);
           } }))
@@ -905,9 +925,48 @@
     return h("div", null, h("h1", null, "Anagrafica"), h("p", { classe: "tenue" }, c.nome || "Nuovo cliente"), form);
   }
 
+  // js/export/csv.js
+  var cella = (v) => {
+    if (v === null || v === void 0) return "";
+    const s = typeof v === "number" ? v.toFixed(2).replace(".", ",") : String(v);
+    const sicura = typeof v === "string" && /^[=+\-@\t\r]/.test(s) ? `'${s}` : s;
+    return /[;"\n\r]/.test(sicura) ? `"${sicura.replace(/"/g, '""')}"` : sicura;
+  };
+  function generaCsv(intestazioni, righe) {
+    return "\uFEFF" + [intestazioni, ...righe].map((r) => r.map(cella).join(";")).join("\r\n") + "\r\n";
+  }
+  var dataIt2 = (iso2) => iso2 ? iso2.split("-").reverse().join("/") : "";
+  function csvFatture(fatture) {
+    return generaCsv(
+      ["Numero", "Data", "Controparte", "Importo", "Data incasso", "Bollo", "ATECO"],
+      fatture.map((f) => [f.numero, dataIt2(f.data), f.controparte, f.importo, dataIt2(f.dataIncasso), f.bollo || 0, f.atecoCodice])
+    );
+  }
+  function csvScadenzario(voci) {
+    return generaCsv(
+      ["Scadenza", "Descrizione", "Importo", "Codice tributo F24", "Anno di riferimento", "Note"],
+      voci.map((v) => [dataIt2(v.data), v.descrizione, v.importo, v.codiceTributo ?? "", v.annoRiferimento ?? "", v.nota ?? ""])
+    );
+  }
+  function csvConfronto(confronto) {
+    const f = confronto.forfettario, o = confronto.ordinario;
+    return generaCsv(["Voce", "Forfettario", "Ordinario"], [
+      ["Ricavi", f.ricavi, o.ricavi],
+      ["Costi reali", o.costi, o.costi],
+      ["Reddito", f.redditoLordo, o.redditoProfessionale],
+      ["Contributi previdenziali", f.contributi.totale, o.contributi.totale],
+      ["Imponibile", f.imponibile, o.imponibile],
+      ["Imposta (sostitutiva / IRPEF netta)", f.imposta, o.irpef],
+      ["Addizionali", 0, o.addizionali],
+      ["IRAP", 0, o.irap],
+      ["Totale imposte e contributi", f.totaleCarico, o.totaleCarico],
+      ["Netto disponibile", f.netto, o.netto]
+    ]);
+  }
+
   // js/import/csv.js
-  function parseCsv(testo) {
-    const t = testo.replace(/^﻿/, "");
+  function parseCsv(testo2) {
+    const t = testo2.replace(/^﻿/, "");
     const primaRiga = t.split(/\r?\n/, 1)[0] ?? "";
     const sep = (primaRiga.match(/;/g)?.length ?? 0) >= (primaRiga.match(/,/g)?.length ?? 0) ? ";" : ",";
     const righe = [];
@@ -963,8 +1022,8 @@
     dataIncasso: ["incasso", "data incasso", "dataincasso", "data_incasso", "pagamento", "data pagamento"],
     ateco: ["ateco", "codice ateco"]
   };
-  function fattureDaCsv(testo) {
-    const righe = parseCsv(testo);
+  function fattureDaCsv(testo2) {
+    const righe = parseCsv(testo2);
     if (righe.length < 2) return { fatture: [], errori: [{ riga: 1, messaggio: "File vuoto o senza righe di dati" }] };
     const intest = righe[0].map((x) => x.trim().toLowerCase());
     const col = {};
@@ -1119,13 +1178,13 @@
       if (!files.length) return;
       const fatture = [], errori = [];
       for (const file of files) {
-        const testo = await file.text();
+        const testo2 = await file.text();
         if (origine === "csv") {
-          const r = fattureDaCsv(testo);
+          const r = fattureDaCsv(testo2);
           fatture.push(...r.fatture);
           errori.push(...r.errori.map((x) => `Riga ${x.riga}: ${x.messaggio}`));
         } else {
-          const r = fattureDaXml(testo, file.name);
+          const r = fattureDaXml(testo2, file.name);
           fatture.push(...r.fatture);
           errori.push(...r.errori);
         }
@@ -1205,7 +1264,9 @@
           h("strong", null, "Importa:"),
           h("button", { onClick: () => importa("csv") }, "File CSV"),
           h("button", { onClick: () => importa("xml") }, "XML FatturaPA"),
-          h("span", { classe: "tenue" }, "CSV: colonne data, importo (obbligatorie), numero, cliente, data incasso, ateco.")
+          h("span", { classe: "tenue" }, "CSV: colonne data, importo (obbligatorie), numero, cliente, data incasso, ateco."),
+          h("strong", null, "Esporta:"),
+          h("button", { onClick: () => scarica(`fatture-${c.nome.replace(/[^\w-]+/g, "_")}-${filtro}.csv`, csvFatture(lista), "text/csv;charset=utf-8") }, `CSV ${filtro}`)
         ),
         areaImport
       ),
@@ -1298,6 +1359,198 @@
     );
   }
 
+  // js/domain/serie.js
+  var MESI = ["gen", "feb", "mar", "apr", "mag", "giu", "lug", "ago", "set", "ott", "nov", "dic"];
+  function incassiMensili(fatture, clienteId, anno2) {
+    const mesi = Array(12).fill(0);
+    for (const f of fattureIncassateNellAnno(fatture, clienteId, anno2)) mesi[Number(f.dataIncasso.slice(5, 7)) - 1] += f.importo;
+    return mesi.map(round2);
+  }
+  function cumulato(valori) {
+    let t = 0;
+    return valori.map((v) => t = round2(t + v));
+  }
+
+  // js/ui/grafici.js
+  var NS = "http://www.w3.org/2000/svg";
+  var svg = (tag, attrs = {}, ...figli) => {
+    const el = document.createElementNS(NS, tag);
+    for (const [k, v] of Object.entries(attrs)) if (v !== null && v !== void 0) el.setAttribute(k === "classe" ? "class" : k, v);
+    el.append(...figli.flat().filter((f) => f !== null && f !== void 0));
+    return el;
+  };
+  var testo = (x, y, t, attrs = {}) => {
+    const el = svg("text", { x, y, ...attrs });
+    el.textContent = t;
+    return el;
+  };
+  var L = 520;
+  var A = 250;
+  var M = { sx: 64, dx: 16, su: 16, giu: 32 };
+  var w = L - M.sx - M.dx;
+  var hh = A - M.su - M.giu;
+  function scalaY(massimo) {
+    const grezzo = massimo > 0 ? massimo : 1;
+    const mag = 10 ** Math.floor(Math.log10(grezzo));
+    const passo = [1, 2, 2.5, 5, 10].map((m) => m * mag).find((p) => grezzo / p <= 5) ?? mag * 10;
+    const cima = Math.ceil(grezzo / passo) * passo;
+    return { cima, passo };
+  }
+  var compatto = (n) => Math.abs(n) >= 1e3 ? `${(n / 1e3).toLocaleString("it-IT", { maximumFractionDigits: 1 })}k` : String(Math.round(n));
+  function tooltipBase(figura) {
+    const tip = h("div", { classe: "tooltip", role: "status", hidden: true });
+    figura.append(tip);
+    const mostra = (clientX, clientY, righe) => {
+      tip.replaceChildren(...righe);
+      tip.hidden = false;
+      const r = figura.getBoundingClientRect();
+      const x = Math.min(clientX - r.left + 12, r.width - tip.offsetWidth - 4);
+      tip.style.left = `${Math.max(4, x)}px`;
+      tip.style.top = `${Math.max(4, clientY - r.top - tip.offsetHeight - 10)}px`;
+    };
+    return { tip, mostra, nascondi: () => {
+      tip.hidden = true;
+    } };
+  }
+  function assiEGriglia(cima, passo, formatoY) {
+    const g = svg("g");
+    for (let v = 0; v <= cima + 1e-9; v += passo) {
+      const y = M.su + hh - v / cima * hh;
+      g.append(svg("line", { x1: M.sx, x2: L - M.dx, y1: y, y2: y, classe: v === 0 ? "asse" : "griglia" }));
+      g.append(testo(M.sx - 8, y + 4, formatoY(v), { classe: "tick", "text-anchor": "end" }));
+    }
+    return g;
+  }
+  function tabella(intestazioni, righe) {
+    return h(
+      "details",
+      { classe: "vista-tabella" },
+      h("summary", null, "Mostra come tabella"),
+      h("div", { classe: "tabella-contenitore" }, h(
+        "table",
+        null,
+        h("thead", null, h("tr", null, intestazioni.map((t, i) => h("th", { classe: i ? "numero" : null }, t)))),
+        h("tbody", null, righe.map((r) => h("tr", null, r.map((c, i) => h("td", { classe: i ? "numero" : null }, c)))))
+      ))
+    );
+  }
+  function graficoColonne({ titolo, descrizione, categorie, valori, formato = euro }) {
+    const { cima, passo } = scalaY(Math.max(...valori, 0));
+    const slot = w / valori.length;
+    const spessore = Math.min(24, slot * 0.6);
+    const figura = h("figure", { classe: "grafico" });
+    const { mostra, nascondi } = tooltipBase(figura);
+    const lienzo = svg("svg", { viewBox: `0 0 ${L} ${A}`, role: "img", "aria-label": `${titolo}. ${descrizione ?? ""}` }, assiEGriglia(cima, passo, compatto));
+    valori.forEach((v, i) => {
+      const x = M.sx + slot * i + (slot - spessore) / 2;
+      const alt = v / cima * hh;
+      const y = M.su + hh - alt;
+      const r = Math.min(4, alt, spessore / 2);
+      const d = alt > 0 ? `M${x},${y + alt} V${y + r} Q${x},${y} ${x + r},${y} H${x + spessore - r} Q${x + spessore},${y} ${x + spessore},${y + r} V${y + alt} Z` : "";
+      const colonna = svg("path", { d, classe: "colonna" });
+      const area = svg("rect", { x: M.sx + slot * i, y: M.su, width: slot, height: hh, classe: "bersaglio", tabindex: "0", "aria-label": `${categorie[i]}: ${formato(v)}` });
+      const riga2 = () => [h("div", { classe: "tip-valore" }, formato(v)), h("div", { classe: "tip-etichetta" }, categorie[i])];
+      const attiva = (e) => {
+        colonna.classList.add("attiva");
+        const b = e.target.getBoundingClientRect();
+        mostra(e.clientX || b.left + b.width / 2, e.clientY || b.top, riga2());
+      };
+      area.addEventListener("pointermove", attiva);
+      area.addEventListener("focus", attiva);
+      area.addEventListener("pointerleave", () => {
+        colonna.classList.remove("attiva");
+        nascondi();
+      });
+      area.addEventListener("blur", () => {
+        colonna.classList.remove("attiva");
+        nascondi();
+      });
+      lienzo.append(colonna, area, testo(M.sx + slot * i + slot / 2, A - 10, categorie[i], { classe: "tick", "text-anchor": "middle" }));
+    });
+    figura.prepend(h("figcaption", null, h("strong", null, titolo), descrizione ? h("div", { classe: "tenue" }, descrizione) : null), lienzo);
+    figura.append(tabella(["Periodo", "Valore"], categorie.map((c, i) => [c, formato(valori[i])])));
+    return figura;
+  }
+  function graficoLinee({ titolo, descrizione, x, serie, formatoX = (n) => String(n), formatoY = euro, riferimentoY, riferimentoX, titoloX = "" }) {
+    const tutti2 = serie.flatMap((s) => s.valori).concat(riferimentoY ? [riferimentoY.valore] : []);
+    const min = Math.min(0, ...tutti2), max = Math.max(...tutti2, 0);
+    const { cima, passo } = scalaY(Math.max(max, -min));
+    const base = min < 0 ? -Math.ceil(-min / passo) * passo : 0;
+    const campo2 = cima - base;
+    const xMin = x[0], xMax = x[x.length - 1];
+    const px = (v) => M.sx + (v - xMin) / (xMax - xMin || 1) * w;
+    const py = (v) => M.su + hh - (v - base) / campo2 * hh;
+    const figura = h("figure", { classe: "grafico" });
+    const { mostra, nascondi } = tooltipBase(figura);
+    const lienzo = svg("svg", { viewBox: `0 0 ${L} ${A}`, role: "img", "aria-label": `${titolo}. ${descrizione ?? ""}` });
+    for (let v = base; v <= cima + 1e-9; v += passo) {
+      lienzo.append(svg("line", { x1: M.sx, x2: L - M.dx, y1: py(v), y2: py(v), classe: v === 0 ? "asse" : "griglia" }), testo(M.sx - 8, py(v) + 4, compatto(v), { classe: "tick", "text-anchor": "end" }));
+    }
+    const passiX = Math.min(x.length - 1, 5);
+    for (let i = 0; i <= passiX; i++) {
+      const v = xMin + (xMax - xMin) * i / passiX;
+      lienzo.append(testo(px(v), A - 10, formatoX(v), { classe: "tick", "text-anchor": i === 0 ? "start" : i === passiX ? "end" : "middle" }));
+    }
+    if (riferimentoY) {
+      lienzo.append(
+        svg("line", { x1: M.sx, x2: L - M.dx, y1: py(riferimentoY.valore), y2: py(riferimentoY.valore), classe: "riferimento" }),
+        testo(L - M.dx - 4, py(riferimentoY.valore) - 5, riferimentoY.etichetta, { classe: "etichetta-rif", "text-anchor": "end" })
+      );
+    }
+    if (riferimentoX && riferimentoX.valore >= xMin && riferimentoX.valore <= xMax) {
+      lienzo.append(
+        svg("line", { x1: px(riferimentoX.valore), x2: px(riferimentoX.valore), y1: M.su, y2: M.su + hh, classe: "riferimento" }),
+        testo(px(riferimentoX.valore) + 4, M.su + 12, riferimentoX.etichetta, { classe: "etichetta-rif" })
+      );
+    }
+    for (const s of serie) {
+      lienzo.append(svg("path", { d: s.valori.map((v, i) => `${i ? "L" : "M"}${px(x[i])},${py(v)}`).join(" "), classe: "linea", style: `stroke: var(${s.colore})` }));
+      const u = s.valori.length - 1;
+      lienzo.append(svg("circle", { cx: px(x[u]), cy: py(s.valori[u]), r: 4, classe: "punto", style: `fill: var(${s.colore})` }));
+    }
+    const guida = svg("line", { classe: "guida", y1: M.su, y2: M.su + hh, hidden: "hidden" });
+    const area = svg("rect", { x: M.sx, y: M.su, width: w, height: hh, classe: "bersaglio", tabindex: "0", "aria-label": `${titolo}: usa le frecce per scorrere i punti` });
+    let corrente = 0;
+    const vai = (i, clientX, clientY) => {
+      corrente = Math.max(0, Math.min(x.length - 1, i));
+      guida.removeAttribute("hidden");
+      guida.setAttribute("x1", px(x[corrente]));
+      guida.setAttribute("x2", px(x[corrente]));
+      const r = area.getBoundingClientRect();
+      mostra(clientX ?? r.left + px(x[corrente]) / L * r.width, clientY ?? r.top + 20, [
+        h("div", { classe: "tip-etichetta" }, titoloX ? `${titoloX}: ${formatoX(x[corrente])}` : formatoX(x[corrente])),
+        ...serie.map((s) => h("div", { classe: "tip-riga" }, h("span", { classe: "chiave", style: `background: var(${s.colore})` }), h("span", { classe: "tip-valore" }, formatoY(s.valori[corrente])), h("span", { classe: "tip-etichetta" }, s.nome)))
+      ]);
+    };
+    area.addEventListener("pointermove", (e) => {
+      const r = area.getBoundingClientRect();
+      const vx = xMin + (e.clientX - r.left) / r.width * (xMax - xMin);
+      vai(x.reduce((m, v, i) => Math.abs(v - vx) < Math.abs(x[m] - vx) ? i : m, 0), e.clientX, e.clientY);
+    });
+    area.addEventListener("keydown", (e) => {
+      if (e.key === "ArrowRight") {
+        e.preventDefault();
+        vai(corrente + 1);
+      }
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        vai(corrente - 1);
+      }
+    });
+    area.addEventListener("focus", () => vai(corrente));
+    const esci = () => {
+      guida.setAttribute("hidden", "hidden");
+      nascondi();
+    };
+    area.addEventListener("pointerleave", esci);
+    area.addEventListener("blur", esci);
+    lienzo.append(guida, area);
+    const legenda = serie.length > 1 ? h("ul", { classe: "legenda" }, serie.map((s) => h("li", null, h("span", { classe: "chiave", style: `background: var(${s.colore})` }), s.nome))) : null;
+    figura.prepend(...[h("figcaption", null, h("strong", null, titolo), descrizione ? h("div", { classe: "tenue" }, descrizione) : null), legenda, lienzo].filter(Boolean));
+    figura.append(tabella([titoloX || "x", ...serie.map((s) => s.nome)], x.map((v, i) => [formatoX(v), ...serie.map((s) => formatoY(s.valori[i]))])));
+    return figura;
+  }
+
   // js/ui/riepilogo.js
   var MESSAGGI_SOGLIA = {
     ok: ["ok", "Entro la soglia.", ""],
@@ -1310,14 +1563,16 @@
     if (!c) return h("div", null, h("h1", null, "Riepilogo"), avviso("attenzione", "Nessun cliente selezionato.", "Creane uno dalla sezione Clienti."));
     const anno2 = ctx.stato.annoRiepilogo ?? (/* @__PURE__ */ new Date()).getFullYear();
     const r = riepilogoAnno(c, dati, anno2, params2);
-    const [tipo, titolo, testo] = MESSAGGI_SOGLIA[r.soglie.stato];
+    const [tipo, titolo, testo2] = MESSAGGI_SOGLIA[r.soglie.stato];
     const pct = Math.min(100, r.soglie.percentuale);
     const barra = h("div", { classe: `barra-soglia ${tipo === "ok" ? "" : tipo}`, role: "img", "aria-label": `${r.soglie.percentuale}% della soglia` }, h("span"));
     barra.firstChild.style.width = `${pct}%`;
     const f = r.forfettario;
+    const mensili = incassiMensili(dati.fatture, c.id, anno2);
     return h(
       "div",
       null,
+      h("div", { classe: "solo-stampa" }, h("strong", null, `${c.nome} \u2014 riepilogo ${anno2}`), h("div", null, `Stampato il ${(/* @__PURE__ */ new Date()).toLocaleDateString("it-IT")}`)),
       h("h1", null, "Riepilogo"),
       h("p", { classe: "tenue" }, c.nome),
       campo("Anno d\u2019imposta", h("input", { type: "number", min: "2000", max: "2100", valore: anno2, onChange: (e) => {
@@ -1338,7 +1593,20 @@
         h("h2", null, "Soglia di ricavi"),
         barra,
         h("div", { classe: "tenue" }, `${euro(r.ricavi)} su 85.000 \u20AC (${r.soglie.percentuale.toLocaleString("it-IT")}%) \u2014 residuo ${euro(r.soglie.residuoSoglia)}`),
-        avviso(tipo, titolo, testo)
+        avviso(tipo, titolo, testo2)
+      ),
+      h(
+        "div",
+        { classe: "griglia-2" },
+        h("div", { classe: "scheda" }, graficoColonne({ titolo: `Incassi mensili ${anno2}`, descrizione: "Ricavi incassati per mese (criterio di cassa)", categorie: MESI, valori: mensili })),
+        h("div", { classe: "scheda" }, graficoLinee({
+          titolo: `Ricavi cumulati ${anno2}`,
+          descrizione: "Andamento rispetto alla soglia di 85.000 \u20AC",
+          x: MESI.map((_, i) => i + 1),
+          formatoX: (v) => MESI[Math.round(v) - 1] ?? "",
+          serie: [{ nome: "Ricavi cumulati", valori: cumulato(mensili), colore: "--serie-1" }],
+          riferimentoY: { valore: params2.forfettario.soglie.ricaviEsclusione, etichetta: "Soglia 85.000 \u20AC" }
+        }))
       ),
       h(
         "div",
@@ -1371,8 +1639,9 @@
           riga(`Imposta sostitutiva al ${percentuale(f.aliquota)}`, f.imposta),
           riga("Totale a carico (imposta + contributi)", f.totaleCarico, true)
         ))),
-        h("p", { classe: "tenue" }, "Stima indicativa: i contributi sono considerati versati nell\u2019anno di competenza. Il calcolo completo con acconti, saldo e confronto con il regime ordinario arriva con la fase 3.")
-      ) : avviso("attenzione", "Stima non disponibile.", "Assegna un codice ATECO con coefficiente alle attivit\xE0 del cliente (sezione Anagrafica).")
+        h("p", { classe: "tenue" }, "Stima indicativa: i contributi sono considerati versati nell\u2019anno di competenza. Per acconti e saldo vedi lo Scadenzario, per il confronto con il regime ordinario la Simulazione.")
+      ) : avviso("attenzione", "Stima non disponibile.", "Assegna un codice ATECO con coefficiente alle attivit\xE0 del cliente (sezione Anagrafica)."),
+      h("div", { classe: "azioni" }, h("button", { onClick: () => window.print() }, "Stampa / PDF"))
     );
   }
   function riga(etichetta, valore, forte = false) {
@@ -1435,6 +1704,438 @@
     );
   }
 
+  // js/fiscal/ordinario.js
+  function calcolaOrdinario(params2, dati) {
+    const ricavi = dati.ricavi;
+    const costi = dati.costi ?? 0;
+    const redditoProfessionale = round2(clamp0(ricavi - costi));
+    const contributi = contributiPrevidenziali(redditoProfessionale, params2, dati.previdenza);
+    const imponibile = round2(clamp0(
+      redditoProfessionale + (dati.altriRedditi ?? 0) - contributi.totale - (dati.altreDeduzioni ?? 0)
+    ));
+    const irpefLorda = applicaScaglioni(imponibile, params2.irpef.scaglioni);
+    const irpef = round2(clamp0(irpefLorda - (dati.detrazioni ?? 0)));
+    const addizionali = round2(
+      imponibile * ((dati.addizionaleRegionale ?? 0) + (dati.addizionaleComunale ?? 0))
+    );
+    const irap = dati.soggettoIrap ? round2(redditoProfessionale * params2.irap.aliquota) : 0;
+    return {
+      ricavi,
+      costi,
+      redditoProfessionale,
+      contributi,
+      imponibile,
+      irpefLorda,
+      irpef,
+      addizionali,
+      irap,
+      totaleCarico: round2(irpef + addizionali + irap + contributi.totale)
+    };
+  }
+
+  // js/fiscal/confronto.js
+  function confrontaRegimi(params2, { ricavi, costiReali, ricaviPerAteco: ricaviPerAteco2, aliquota, previdenza, riduzione35, ordinario = {} }) {
+    const forf = calcolaForfettario(params2, { ricavi: ricaviPerAteco2, previdenza, aliquota, riduzione35 });
+    const ord = calcolaOrdinario(params2, { ricavi, costi: costiReali, previdenza, ...ordinario });
+    const nettoForfettario = round2(ricavi - costiReali - forf.totaleCarico);
+    const nettoOrdinario = round2(ricavi - costiReali - ord.totaleCarico);
+    const differenza = round2(nettoForfettario - nettoOrdinario);
+    return {
+      forfettario: { ...forf, netto: nettoForfettario },
+      ordinario: { ...ord, netto: nettoOrdinario },
+      differenza,
+      conveniente: differenza === 0 ? "pari" : differenza > 0 ? "forfettario" : "ordinario"
+    };
+  }
+  function scenari(params2, base, variazioni) {
+    return variazioni.map((v) => {
+      const ricavi = base.ricavi * (1 + (v.ricaviPct ?? 0));
+      const costiReali = base.costiReali * (1 + (v.costiPct ?? 0));
+      const fattore = base.ricavi === 0 ? 0 : ricavi / base.ricavi;
+      const ricaviPerAteco2 = base.ricaviPerAteco.map((r) => ({ ...r, importo: r.importo * fattore }));
+      return { variazione: v, ...confrontaRegimi(params2, { ...base, ricavi, costiReali, ricaviPerAteco: ricaviPerAteco2 }) };
+    });
+  }
+
+  // js/ui/simulazione.js
+  var num = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+  function vistaSimulazione(ctx) {
+    var _a;
+    const { dati, cliente: c, params: params2 } = ctx;
+    if (!c) return h("div", null, h("h1", null, "Simulazione"), avviso("attenzione", "Nessun cliente selezionato."));
+    const anno2 = ctx.stato.annoSim ?? (/* @__PURE__ */ new Date()).getFullYear();
+    const r = riepilogoAnno(c, dati, anno2, params2);
+    const voci = r.perAteco.filter((v) => v.coefficiente > 0);
+    if (voci.length === 0) {
+      return h("div", null, h("h1", null, "Simulazione"), avviso("attenzione", "Servono i codici ATECO.", "Assegna almeno un codice ATECO con coefficiente nell\u2019anagrafica del cliente."));
+    }
+    const s = (_a = ctx.stato).sim ?? (_a.sim = { ricavi: null, costi: null, ricaviPct: 0, costiPct: 0, addReg: 1.73, addCom: 0.8, detrazioni: 0, altriRedditi: 0, irap: false });
+    const ricaviBase = s.ricavi ?? r.ricavi;
+    const costiBase = s.costi ?? r.spese;
+    const risultati = h("div");
+    function ricalcola() {
+      const ricavi = round2(ricaviBase * (1 + s.ricaviPct / 100));
+      const costi = round2(costiBase * (1 + s.costiPct / 100));
+      const somma = voci.reduce((t, v) => t + v.importo, 0);
+      const ripartiti = voci.map((v, i) => ({ importo: somma > 0 ? v.importo / somma * ricavi : i === 0 ? ricavi : 0, coefficiente: v.coefficiente }));
+      const input = {
+        ricavi,
+        costiReali: costi,
+        ricaviPerAteco: ripartiti,
+        aliquota: r.aliquota.aliquota,
+        previdenza: c.previdenza,
+        riduzione35: c.previdenza.riduzione35,
+        ordinario: { addizionaleRegionale: s.addReg / 100, addizionaleComunale: s.addCom / 100, detrazioni: s.detrazioni, altriRedditi: s.altriRedditi, soggettoIrap: s.irap }
+      };
+      const conf = confrontaRegimi(params2, input);
+      const f = conf.forfettario, o = conf.ordinario;
+      const soglia = verificaSoglieRicavi(params2, ricavi);
+      const riga2 = (et, vf, vo, evidenzia) => h("tr", null, h("td", null, et), h("td", { classe: "numero" }, evidenzia ? h("strong", null, euro(vf)) : euro(vf)), h("td", { classe: "numero" }, evidenzia ? h("strong", null, euro(vo)) : euro(vo)));
+      const conv = conf.conveniente;
+      const x = [-50, -40, -30, -20, -10, 0, 10, 20, 30, 40, 50];
+      const sc = scenari(params2, { ...input }, x.map((p) => ({ ricaviPct: p / 100 })));
+      const ricaviX = sc.map((q) => q.forfettario.ricavi);
+      risultati.replaceChildren(
+        soglia.stato === "esce-subito" ? avviso("errore", "Oltre 100.000 \u20AC.", "Il forfettario cessa subito: il confronto \xE8 solo indicativo.") : soglia.stato === "esce-anno-successivo" ? avviso("attenzione", "Oltre 85.000 \u20AC.", "Il regime forfettario cessa dall\u2019anno successivo.") : null,
+        h(
+          "div",
+          { classe: "statistiche" },
+          h("div", { classe: "statistica" }, h("div", { classe: `valore ${conv === "forfettario" ? "vince" : ""}` }, euro(f.netto)), h("div", { classe: "etichetta" }, "Netto con il forfettario")),
+          h("div", { classe: "statistica" }, h("div", { classe: `valore ${conv === "ordinario" ? "vince" : ""}` }, euro(o.netto)), h("div", { classe: "etichetta" }, "Netto in regime ordinario")),
+          h("div", { classe: "statistica" }, h("div", { classe: "valore" }, conv === "pari" ? "Pari" : `${conv === "forfettario" ? "Forfettario" : "Ordinario"} +${euro(Math.abs(conf.differenza))}`), h("div", { classe: "etichetta" }, "Regime pi\xF9 conveniente"))
+        ),
+        h(
+          "div",
+          { classe: "scheda" },
+          h("div", { classe: "tabella-contenitore" }, h(
+            "table",
+            { classe: "confronto" },
+            h("thead", null, h("tr", null, h("th", null, "Voce"), h("th", { classe: "numero" }, "Forfettario"), h("th", { classe: "numero" }, "Ordinario"))),
+            h(
+              "tbody",
+              null,
+              riga2("Ricavi", f.ricavi, o.ricavi),
+              riga2("Costi reali sostenuti", costi, costi),
+              riga2("Reddito", f.redditoLordo, o.redditoProfessionale),
+              riga2("Contributi previdenziali", f.contributi.totale, o.contributi.totale),
+              riga2("Imponibile fiscale", f.imponibile, o.imponibile),
+              riga2(`Imposta (${percentuale(f.aliquota)} sostitutiva / IRPEF netta)`, f.imposta, o.irpef),
+              riga2("Addizionali regionale e comunale", 0, o.addizionali),
+              riga2("IRAP", 0, o.irap),
+              riga2("Totale imposte e contributi", f.totaleCarico, o.totaleCarico, true),
+              riga2("Netto disponibile (ricavi \u2212 costi \u2212 imposte \u2212 contributi)", f.netto, o.netto, true)
+            )
+          )),
+          h(
+            "div",
+            { classe: "azioni" },
+            h("button", { onClick: () => scarica(`confronto-regimi-${anno2}.csv`, csvConfronto(conf), "text/csv;charset=utf-8") }, "Esporta CSV"),
+            h("button", { onClick: () => window.print() }, "Stampa / PDF")
+          )
+        ),
+        h(
+          "div",
+          { classe: "scheda" },
+          graficoLinee({
+            titolo: "Netto al variare dei ricavi",
+            descrizione: "Stessi costi, ricavi da \u221250% a +50% rispetto alla simulazione. Il forfettario non \xE8 applicabile oltre 85.000 \u20AC.",
+            x: ricaviX,
+            titoloX: "Ricavi",
+            formatoX: (v) => euro(Math.round(v)).replace(",00", ""),
+            serie: [
+              { nome: "Forfettario", valori: sc.map((q) => q.forfettario.netto), colore: "--serie-1" },
+              { nome: "Ordinario", valori: sc.map((q) => q.ordinario.netto), colore: "--serie-2" }
+            ],
+            riferimentoX: { valore: params2.forfettario.soglie.ricaviEsclusione, etichetta: "Soglia 85.000 \u20AC" }
+          })
+        ),
+        h("p", { classe: "tenue" }, "Semplificazioni: nel regime ordinario le detrazioni IRPEF sono un importo da inserire, l\u2019IVA \xE8 considerata neutra, e non sono modellati ammortamenti, perdite pregresse, deduzioni oltre ai contributi, n\xE9 i limiti all\u2019IRAP per i professionisti. Stima indicativa, da verificare con il commercialista.")
+      );
+    }
+    const slider = (etichetta, chiave, min, max) => {
+      const out = h("span", { classe: "tenue" }, `${s[chiave] > 0 ? "+" : ""}${s[chiave]}%`);
+      const inp = h("input", { type: "range", min, max, step: "1", valore: s[chiave], "aria-label": etichetta, onInput: (e) => {
+        s[chiave] = Number(e.target.value);
+        out.textContent = `${s[chiave] > 0 ? "+" : ""}${s[chiave]}%`;
+        ricalcola();
+      } });
+      return h("div", { classe: "slider" }, h("label", null, etichetta, " ", out), inp);
+    };
+    const numero = (chiave, props = {}) => h("input", { type: "number", step: "0.01", min: "0", valore: s[chiave], onInput: (e) => {
+      s[chiave] = num(e.target.value);
+      ricalcola();
+    }, ...props });
+    ricalcola();
+    return h(
+      "div",
+      null,
+      h("div", { classe: "solo-stampa" }, h("strong", null, `${c.nome} \u2014 simulazione forfettario / ordinario ${anno2}`), h("div", null, `Stampato il ${(/* @__PURE__ */ new Date()).toLocaleDateString("it-IT")}`)),
+      h("h1", null, "Simulazione forfettario vs ordinario"),
+      h("p", { classe: "tenue" }, `${c.nome}. Parti dai dati registrati e prova scenari diversi con i cursori.`),
+      h(
+        "div",
+        { classe: "scheda" },
+        h("h2", null, "Punto di partenza"),
+        h(
+          "div",
+          { classe: "griglia" },
+          campo("Anno", h("input", { type: "number", min: "2000", max: "2100", valore: anno2, onChange: (e) => {
+            ctx.stato.annoSim = Number(e.target.value);
+            ctx.stato.sim.ricavi = null;
+            ctx.stato.sim.costi = null;
+            ctx.aggiorna();
+          } })),
+          campo("Ricavi (\u20AC)", h("input", { type: "number", step: "0.01", min: "0", valore: ricaviBase, onInput: (e) => {
+            s.ricavi = num(e.target.value);
+            ricalcola();
+          } }), "Predefinito: incassi registrati nell\u2019anno."),
+          campo("Costi reali (\u20AC)", h("input", { type: "number", step: "0.01", min: "0", valore: costiBase, onInput: (e) => {
+            s.costi = num(e.target.value);
+            ricalcola();
+          } }), "Predefinito: spese registrate nell\u2019anno.")
+        ),
+        h("h2", null, "Scenario what-if"),
+        h("div", { classe: "griglia" }, slider("Variazione dei ricavi", "ricaviPct", -50, 100), slider("Variazione dei costi", "costiPct", -50, 100)),
+        h(
+          "details",
+          null,
+          h("summary", null, "Parametri del regime ordinario"),
+          h(
+            "div",
+            { classe: "griglia" },
+            campo("Addizionale regionale (%)", numero("addReg", { step: "0.01" })),
+            campo("Addizionale comunale (%)", numero("addCom", { step: "0.01" })),
+            campo("Detrazioni IRPEF spettanti (\u20AC)", numero("detrazioni")),
+            campo("Altri redditi imponibili (\u20AC)", numero("altriRedditi")),
+            h("label", { classe: "spunta" }, h("input", { type: "checkbox", checked: s.irap, onChange: (e) => {
+              s.irap = e.target.checked;
+              ricalcola();
+            } }), "Soggetto a IRAP (3,9%)")
+          )
+        )
+      ),
+      risultati
+    );
+  }
+
+  // js/fiscal/acconti.js
+  function accontiSostitutiva(params2, impostaAnnoPrecedente) {
+    const a = params2.forfettario.acconto;
+    if (impostaAnnoPrecedente <= a.sogliaMinima) return { prima: 0, seconda: 0, totale: 0 };
+    if (impostaAnnoPrecedente <= a.sogliaRataUnica) {
+      return { prima: 0, seconda: round2(impostaAnnoPrecedente), totale: round2(impostaAnnoPrecedente) };
+    }
+    const prima = round2(impostaAnnoPrecedente * a.percentualeRata1);
+    const seconda = round2(impostaAnnoPrecedente - prima);
+    return { prima, seconda, totale: round2(prima + seconda) };
+  }
+
+  // js/fiscal/scadenzario.js
+  function pasqua(anno2) {
+    const a = anno2 % 19, b = Math.floor(anno2 / 100), c = anno2 % 100;
+    const d = Math.floor(b / 4), e = b % 4, f = Math.floor((b + 8) / 25), g = Math.floor((b - f + 1) / 3);
+    const h2 = (19 * a + b - d - g + 15) % 30, i = Math.floor(c / 4), k = c % 4;
+    const l = (32 + 2 * e + 2 * i - h2 - k) % 7, m = Math.floor((a + 11 * h2 + 22 * l) / 451);
+    const mese = Math.floor((h2 + l - 7 * m + 114) / 31), giorno = (h2 + l - 7 * m + 114) % 31 + 1;
+    return new Date(Date.UTC(anno2, mese - 1, giorno));
+  }
+  var FESTIVI_FISSI = ["01-01", "01-06", "04-25", "05-01", "06-02", "08-15", "11-01", "12-08", "12-25", "12-26"];
+  var iso = (d) => d.toISOString().slice(0, 10);
+  function eFestivo(isoData) {
+    const d = /* @__PURE__ */ new Date(`${isoData}T00:00:00Z`);
+    const g = d.getUTCDay();
+    if (g === 0 || g === 6) return true;
+    if (FESTIVI_FISSI.includes(isoData.slice(5))) return true;
+    const lunediAngelo = new Date(pasqua(d.getUTCFullYear()).getTime() + 864e5);
+    return iso(lunediAngelo) === isoData;
+  }
+  function prossimoLavorativo(isoData) {
+    let d = /* @__PURE__ */ new Date(`${isoData}T00:00:00Z`);
+    while (eFestivo(iso(d))) d = new Date(d.getTime() + 864e5);
+    return iso(d);
+  }
+  var scadenza = (anno2, mmgg) => prossimoLavorativo(`${anno2}-${mmgg}`);
+  function calcolaScadenzario(params2, d) {
+    const P = d.annoPagamento;
+    const voci = [];
+    const fp = params2.forfettario;
+    const dataGiugno = d.prorogaEstate2026 && P === 2026 ? scadenza(P, fp.scadenze.saldoEPrimoAccontoProroga2026) : scadenza(P, fp.scadenze.saldoEPrimoAcconto);
+    const dataNovembre = scadenza(P, fp.scadenze.secondoAcconto);
+    const saldo = round2(d.impostaAnnoPrec - d.accontiSostitutivaVersati);
+    const acc = accontiSostitutiva(params2, d.impostaAnnoPrec);
+    voci.push({
+      id: "sost-saldo",
+      tipo: "imposta",
+      data: dataGiugno,
+      descrizione: `Saldo imposta sostitutiva ${P - 1}`,
+      importo: clamp0(saldo),
+      codiceTributo: fp.codiciTributo.saldo,
+      annoRiferimento: P - 1,
+      nota: saldo < 0 ? `Credito di ${Math.abs(saldo).toFixed(2)} \u20AC utilizzabile in compensazione` : ""
+    });
+    if (acc.prima > 0) voci.push({
+      id: "sost-acc1",
+      tipo: "imposta",
+      data: dataGiugno,
+      descrizione: `Primo acconto imposta sostitutiva ${P}`,
+      importo: acc.prima,
+      codiceTributo: fp.codiciTributo.accontoPrimaRata,
+      annoRiferimento: P,
+      nota: "Metodo storico"
+    });
+    if (acc.seconda > 0) voci.push({
+      id: "sost-acc2",
+      tipo: "imposta",
+      data: dataNovembre,
+      descrizione: acc.prima > 0 ? `Secondo acconto imposta sostitutiva ${P}` : `Acconto in unica soluzione imposta sostitutiva ${P}`,
+      importo: acc.seconda,
+      codiceTributo: fp.codiciTributo.accontoSecondaRataOUnica,
+      annoRiferimento: P,
+      nota: "Metodo storico"
+    });
+    const prev = d.previdenza;
+    const inps = d.contributiAnnoPrec;
+    if (prev.tipo === "gestione-separata") {
+      const a = params2.gestioneSeparata.acconto;
+      const saldoInps = round2(inps.totale - d.accontiInpsVersati);
+      const rata = round2(inps.totale * a.percentuale / a.rate);
+      voci.push({
+        id: "inps-saldo",
+        tipo: "inps",
+        data: dataGiugno,
+        descrizione: `Saldo contributi Gestione Separata ${P - 1}`,
+        importo: clamp0(saldoInps),
+        annoRiferimento: P - 1,
+        nota: saldoInps < 0 ? "Credito" : ""
+      });
+      voci.push({ id: "inps-acc1", tipo: "inps", data: dataGiugno, descrizione: `Primo acconto contributi Gestione Separata ${P}`, importo: rata, annoRiferimento: P, nota: `${a.percentuale * 100 / a.rate}% dei contributi ${P - 1}` });
+      voci.push({ id: "inps-acc2", tipo: "inps", data: dataNovembre, descrizione: `Secondo acconto contributi Gestione Separata ${P}`, importo: rata, annoRiferimento: P, nota: `${a.percentuale * 100 / a.rate}% dei contributi ${P - 1}` });
+    } else if (prev.tipo === "artigiani" || prev.tipo === "commercianti") {
+      const ivs = params2.ivs;
+      const fisso = d.contributiFissiAnno ?? round2((ivs.minimale * ivs.aliquote[prev.tipo] + ivs.contributoMaternitaAnnuo) * (prev.riduzione35 ? 1 - fp.riduzioneContributiIvs : 1));
+      ivs.scadenzeFissi.forEach((mmgg, i) => {
+        const anno2 = mmgg === "02-16" ? P + 1 : P;
+        voci.push({ id: `inps-fisso-${i + 1}`, tipo: "inps", data: scadenza(anno2, mmgg), descrizione: `Contributi fissi IVS ${P}, rata ${i + 1} di 4`, importo: round2(fisso / 4), annoRiferimento: P, nota: "Versamento con F24 INPS" });
+      });
+      const fissoPrec = d.contributiFissiAnnoPrec ?? fisso;
+      const eccedenzaPrec = clamp0(round2(inps.totale - fissoPrec));
+      const saldoEcc = round2(eccedenzaPrec - d.accontiInpsVersati);
+      const rataEcc = round2(eccedenzaPrec * ivs.acconto.percentuale / ivs.acconto.rate);
+      voci.push({ id: "inps-saldo", tipo: "inps", data: dataGiugno, descrizione: `Saldo contributi sul reddito eccedente il minimale ${P - 1}`, importo: clamp0(saldoEcc), annoRiferimento: P - 1, nota: saldoEcc < 0 ? "Credito" : "" });
+      if (rataEcc > 0) {
+        voci.push({ id: "inps-acc1", tipo: "inps", data: dataGiugno, descrizione: `Primo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, nota: "Regola di acconto da verificare" });
+        voci.push({ id: "inps-acc2", tipo: "inps", data: dataNovembre, descrizione: `Secondo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, nota: "Regola di acconto da verificare" });
+      }
+    } else {
+      voci.push({ id: "inps-cassa", tipo: "inps", data: null, descrizione: "Contributi alla cassa professionale", importo: 0, nota: "Scadenze e importi definiti dalla cassa di appartenenza: non calcolati." });
+    }
+    voci.push({ id: "dichiarazione", tipo: "adempimento", data: scadenza(P, fp.scadenze.dichiarazione), descrizione: `Invio dichiarazione dei redditi (anno d'imposta ${P - 1})`, importo: 0, annoRiferimento: P - 1, nota: "" });
+    return voci.sort((a, b) => (a.data ?? "9999").localeCompare(b.data ?? "9999") || a.id.localeCompare(b.id));
+  }
+
+  // js/ui/scadenze.js
+  var num2 = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
+  var oggi = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
+  function vistaScadenze(ctx) {
+    var _a;
+    const { archivio: archivio2, dati, cliente: c, params: params2 } = ctx;
+    if (!c) return h("div", null, h("h1", null, "Scadenzario"), avviso("attenzione", "Nessun cliente selezionato."));
+    const P = ctx.stato.annoScadenze ?? (/* @__PURE__ */ new Date()).getFullYear();
+    const prec = riepilogoAnno(c, dati, P - 1, params2);
+    const versati = c.versamenti?.[P - 1] ?? {};
+    const stimaImposta = prec.forfettario?.imposta ?? 0;
+    const stimaContributi = prec.forfettario?.contributi ?? { totale: 0 };
+    const s = (_a = ctx.stato).scad ?? (_a.scad = {});
+    if (s.anno !== P) Object.assign(s, { anno: P, imposta: null, contributi: null, accSost: null, accInps: null, proroga: P === 2026 });
+    const val = (chiave, predefinito) => s[chiave] ?? predefinito;
+    const risultati = h("div");
+    const esito = h("div");
+    function ricalcola() {
+      const contributi = { ...stimaContributi, totale: val("contributi", stimaContributi.totale) };
+      const voci = calcolaScadenzario(params2, {
+        annoPagamento: P,
+        impostaAnnoPrec: val("imposta", stimaImposta),
+        accontiSostitutivaVersati: val("accSost", versati.sostitutiva ?? 0),
+        contributiAnnoPrec: contributi,
+        accontiInpsVersati: val("accInps", versati.inps ?? 0),
+        previdenza: c.previdenza,
+        prorogaEstate2026: s.proroga
+      });
+      const futuri = voci.filter((v) => v.data && v.data >= oggi() && v.importo > 0);
+      const totale = round2(voci.reduce((t, v) => t + v.importo, 0));
+      const prossima = futuri[0];
+      risultati.replaceChildren(
+        prossima ? avviso("attenzione", `Prossima scadenza: ${dataIt(prossima.data)}.`, `${prossima.descrizione} \u2014 ${euro(prossima.importo)}`) : avviso("ok", "Nessuna scadenza futura con importo per questo anno."),
+        h(
+          "div",
+          { classe: "scheda" },
+          h("div", { classe: "tabella-contenitore" }, h(
+            "table",
+            null,
+            h("thead", null, h("tr", null, h("th", null, "Scadenza"), h("th", null, "Versamento"), h("th", null, "F24"), h("th", { classe: "numero" }, "Importo"))),
+            h("tbody", null, voci.map((v) => h(
+              "tr",
+              null,
+              h("td", null, v.data ? dataIt(v.data) : "\u2014", v.data && v.data < oggi() ? h("div", { classe: "tenue" }, "scaduta") : null),
+              h("td", null, v.descrizione, v.nota ? h("div", { classe: "tenue" }, v.nota) : null),
+              h("td", null, v.codiceTributo ? `Erario ${v.codiceTributo} / ${v.annoRiferimento}` : v.tipo === "inps" ? "INPS" : ""),
+              h("td", { classe: "numero" }, v.tipo === "adempimento" ? "" : euro(v.importo))
+            ))),
+            h("tfoot", null, h("tr", null, h("td", { colspan: "3" }, "Totale versamenti"), h("td", { classe: "numero" }, euro(totale))))
+          )),
+          h(
+            "div",
+            { classe: "azioni" },
+            h("button", { onClick: () => scarica(`scadenzario-${P}.csv`, csvScadenzario(voci), "text/csv;charset=utf-8") }, "Esporta CSV"),
+            h("button", { onClick: () => window.print() }, "Stampa / PDF")
+          )
+        )
+      );
+    }
+    const numero = (chiave, predefinito) => h("input", { type: "number", step: "0.01", min: "0", valore: val(chiave, predefinito), onInput: (e) => {
+      s[chiave] = num2(e.target.value);
+      ricalcola();
+    } });
+    const inpsEtichetta = c.previdenza.tipo === "artigiani" || c.previdenza.tipo === "commercianti" ? "Contributi INPS dovuti per l\u2019anno precedente, fissi inclusi (\u20AC)" : "Contributi INPS dovuti per l\u2019anno precedente (\u20AC)";
+    ricalcola();
+    return h(
+      "div",
+      null,
+      h("div", { classe: "solo-stampa" }, h("strong", null, `${c.nome} \u2014 scadenzario ${P}`), h("div", null, `Stampato il ${(/* @__PURE__ */ new Date()).toLocaleDateString("it-IT")}`)),
+      h("h1", null, "Scadenzario"),
+      h("p", { classe: "tenue" }, `${c.nome}. Versamenti dell\u2019anno ${P}: saldo ${P - 1} e acconti ${P}.`),
+      h(
+        "div",
+        { classe: "scheda" },
+        h(
+          "div",
+          { classe: "griglia" },
+          campo("Anno dei versamenti", h("input", { type: "number", min: "2000", max: "2100", valore: P, onChange: (e) => {
+            ctx.stato.annoScadenze = Number(e.target.value);
+            ctx.aggiorna();
+          } })),
+          campo(`Imposta sostitutiva dovuta per il ${P - 1} (\u20AC)`, numero("imposta", stimaImposta), `Stima dai dati registrati: ${euro(stimaImposta)}. Correggila con il valore della dichiarazione.`),
+          campo(`Acconti imposta gi\xE0 versati per il ${P - 1} (\u20AC)`, numero("accSost", versati.sostitutiva ?? 0)),
+          campo(inpsEtichetta, numero("contributi", stimaContributi.totale), `Stima: ${euro(stimaContributi.totale)}.`),
+          campo(`Acconti INPS gi\xE0 versati per il ${P - 1} (\u20AC)`, numero("accInps", versati.inps ?? 0))
+        ),
+        P === 2026 ? h("label", { classe: "spunta" }, h("input", { type: "checkbox", checked: s.proroga, onChange: (e) => {
+          s.proroga = e.target.checked;
+          ricalcola();
+        } }), "Saldo e primo acconto prorogati al 20 luglio (art. 6 DL 89/2026, con effetti fatti salvi dalla L. 113/2026)") : null,
+        h("div", { classe: "azioni" }, h("button", { onClick: async () => {
+          await archivio2.modifica((d) => {
+            const cl = d.clienti.find((x) => x.id === c.id);
+            cl.versamenti = { ...cl.versamenti, [P - 1]: { sostitutiva: val("accSost", 0), inps: val("accInps", 0) } };
+          });
+        } }, "Salva acconti versati"))
+      ),
+      esito,
+      risultati,
+      avviso("attenzione", "Stima indicativa.", `Gli importi dell\u2019anno ${P - 1} sono ricavati dai dati registrati con i parametri 2026. I codici tributo F24 sono quelli dell\u2019imposta sostitutiva; per i contributi INPS i codici e le causali vanno verificati. L\u2019acconto della Gestione Separata (80% in due rate) e quello sul reddito eccedente IVS sono da verificare.`)
+    );
+  }
+
   // js/app.js
   var ROTTE = [
     { path: "#/riepilogo", titolo: "Riepilogo", vista: vistaRiepilogo },
@@ -1442,6 +2143,8 @@
     { path: "#/anagrafica", titolo: "Anagrafica", vista: vistaAnagrafica },
     { path: "#/fatture", titolo: "Fatture", vista: vistaFatture },
     { path: "#/spese", titolo: "Spese", vista: vistaSpese },
+    { path: "#/simulazione", titolo: "Simulazione", vista: vistaSimulazione },
+    { path: "#/scadenze", titolo: "Scadenzario", vista: vistaScadenze },
     { path: "#/backup", titolo: "Backup", vista: vistaBackup }
   ];
   var INATTIVITA_MS = 15 * 60 * 1e3;

@@ -56,7 +56,7 @@ tests/          test del motore di calcolo (pagina HTML o Node)
 
 1. **Motore di calcolo** (logica pura + parametri per anno + test). Tutti i parametri vanno verificati su fonti ufficiali (Normattiva, Agenzia Entrate, INPS) prima di essere fissati.
 2. **Interfaccia e dati** (fatta): sidebar con selettore cliente, archivio cifrato in IndexedDB con backup, anagrafica, fatture (manuale, CSV, XML FatturaPA), spese, riepilogo annuale.
-3. **Simulazione, controlli, scadenzario, output e dashboard.**
+3. **Simulazione, scadenzario, output e dashboard** (fatta): confronto forfettario/ordinario con scenari what-if e grafico, scadenzario con codici F24, grafici nel riepilogo, export CSV e stampa/PDF.
 
 ## Fase 1 completata
 
@@ -93,3 +93,20 @@ Limiti noti:
 - Le fatture XML non portano la data di incasso: va inserita a mano.
 - I contributi del riepilogo sono quelli di competenza, non quelli effettivamente versati nell'anno.
 - Il cambio password non è ancora previsto (workaround: backup, nuovo archivio, ripristino).
+
+## Fase 3: cosa c'è e cosa no
+
+Fatto:
+- **Simulazione** (`js/ui/simulazione.js`): confronto affiancato, cursori su ricavi e costi, parametri del regime ordinario (addizionali, detrazioni, altri redditi, IRAP), grafico del netto al variare dei ricavi con soglia di 85.000 €, avvisi oltre 85.000/100.000 €.
+- **Scadenzario** (`js/fiscal/scadenzario.js`): saldo e acconti dell'imposta sostitutiva con codici 1790/1791/1792, contributi Gestione Separata e IVS (rate fisse e acconti sull'eccedenza), dichiarazione; scadenze festive/weekend che slittano al giorno lavorativo successivo; acconti già versati salvabili per cliente.
+- **Dashboard** nel Riepilogo: incassi mensili e ricavi cumulati contro la soglia, con tooltip, tastiera e vista tabella. Palette blu/arancio validata con lo script di dataviz (chiaro e scuro).
+- **Output**: CSV (fatture, confronto, scadenzario; separatore `;`, virgola decimale, protezione da formule) e stampa/PDF dal browser.
+- Provato in Chromium da `file://` con un cliente di esempio: i numeri di simulazione e scadenzario sono stati ricontrollati a mano.
+
+Da verificare o mancante:
+- Acconto Gestione Separata (80% in due rate) e acconti IVS sull'eccedenza: regola non verificata su fonte ufficiale (`daVerificare` nei parametri).
+- Codici tributo e causali INPS per l'F24: non inclusi.
+- Casse professionali: nessuno scadenzario (importi e date dipendono dalla cassa).
+- Ordinario: detrazioni IRPEF da inserire a mano, IVA neutra, niente ammortamenti, perdite pregresse o altre deduzioni.
+- Scadenzario e simulazione usano i parametri 2026 anche per l'anno precedente.
+- Il PDF si ottiene con "Stampa / PDF" del browser (nessuna libreria PDF).

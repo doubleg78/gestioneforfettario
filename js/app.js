@@ -9,6 +9,8 @@ import { vistaFatture } from './ui/fatture.js';
 import { vistaSpese } from './ui/spese.js';
 import { vistaRiepilogo } from './ui/riepilogo.js';
 import { vistaBackup } from './ui/backup.js';
+import { vistaSimulazione } from './ui/simulazione.js';
+import { vistaScadenze } from './ui/scadenze.js';
 
 const ROTTE = [
   { path: '#/riepilogo', titolo: 'Riepilogo', vista: vistaRiepilogo },
@@ -16,6 +18,8 @@ const ROTTE = [
   { path: '#/anagrafica', titolo: 'Anagrafica', vista: vistaAnagrafica },
   { path: '#/fatture', titolo: 'Fatture', vista: vistaFatture },
   { path: '#/spese', titolo: 'Spese', vista: vistaSpese },
+  { path: '#/simulazione', titolo: 'Simulazione', vista: vistaSimulazione },
+  { path: '#/scadenze', titolo: 'Scadenzario', vista: vistaScadenze },
   { path: '#/backup', titolo: 'Backup', vista: vistaBackup },
 ];
 const INATTIVITA_MS = 15 * 60 * 1000;

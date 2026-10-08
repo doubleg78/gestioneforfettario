@@ -1,4 +1,5 @@
-import { h, campo, avviso, euro, dataIt, selezionaFile } from './dom.js';
+import { h, campo, avviso, euro, dataIt, selezionaFile, scarica } from './dom.js';
+import { csvFatture } from '../export/csv.js';
 import { nuovaFattura } from '../domain/modello.js';
 import { bolloDovuto } from '../fiscal/forfettario.js';
 import { fattureDaCsv } from '../import/csv.js';
@@ -119,7 +120,9 @@ export function vistaFatture(ctx) {
         h('strong', null, 'Importa:'),
         h('button', { onClick: () => importa('csv') }, 'File CSV'),
         h('button', { onClick: () => importa('xml') }, 'XML FatturaPA'),
-        h('span', { classe: 'tenue' }, 'CSV: colonne data, importo (obbligatorie), numero, cliente, data incasso, ateco.')),
+        h('span', { classe: 'tenue' }, 'CSV: colonne data, importo (obbligatorie), numero, cliente, data incasso, ateco.'),
+        h('strong', null, 'Esporta:'),
+        h('button', { onClick: () => scarica(`fatture-${c.nome.replace(/[^\w-]+/g, '_')}-${filtro}.csv`, csvFatture(lista), 'text/csv;charset=utf-8') }, `CSV ${filtro}`)),
       areaImport),
     h('div', { classe: 'scheda' },
       h('div', { classe: 'azioni' },
