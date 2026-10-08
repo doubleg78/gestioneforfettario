@@ -82,3 +82,19 @@ test('cambio password: la vecchia non funziona più, la nuova sì, i dati restan
   await lettura.sblocca('password-nuova-1');
   assert.deepEqual(lettura.dati.clienti.map((c) => c.nome), ['Mario', 'Luisa']);
 });
+
+test('eliminazione totale: senza password, l\'archivio riparte da zero', async () => {
+  const a = adattatoreMemoria();
+  const arch = nuovo(a);
+  await arch.crea('segreta');
+  await arch.modifica((d) => d.clienti.push({ id: '1', nome: 'Mario Rossi' }));
+  let notifiche = 0;
+  arch.ascolta(() => notifiche++);
+  await arch.elimina();
+  assert.equal(await arch.esiste(), false);
+  assert.equal(arch.sbloccato, false);
+  assert.equal(notifiche, 1);
+  assert.equal(await a.leggi('archivio'), null);
+  await arch.crea('altra-password');
+  assert.deepEqual(arch.dati.clienti, []);
+});

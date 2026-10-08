@@ -21,6 +21,8 @@
     carica: "M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M17 8l-5-5-5 5M12 3v12",
     stampa: "M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2M6 14h12v8H6z",
     modifica: "M12 20h9M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z",
+    campana: "M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9M10.3 21a1.94 1.94 0 0 0 3.4 0",
+    "su-giu": "M7 15l5 5 5-5M7 9l5-5 5 5",
     cestino: "M3 6h18M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6M10 11v6M14 11v6",
     spunta: "M20 6L9 17l-5-5",
     avviso: "M10.3 3.9L1.8 18a2 2 0 0 0 1.7 3h17a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0zM12 9v4M12 17h.01",
@@ -347,6 +349,18 @@
       this.sessione = await nuovaSessione(nuova, this.iterazioni);
       await this.salva();
     }
+    /**
+     * Eliminazione totale: cancella dal database il blocco cifrato e tutto il resto, senza chiedere la password
+     * (serve anche a chi l'ha dimenticata). Dopo la chiamata l'archivio è come al primo avvio.
+     */
+    async elimina() {
+      await this._coda;
+      await this.adattatore.svuota();
+      this.sessione = null;
+      this.dati = null;
+      this._coda = Promise.resolve();
+      this._notifica();
+    }
     blocca() {
       this.sessione = null;
       this.dati = null;
@@ -415,7 +429,8 @@
     return {
       leggi: (k) => tx("readonly", (s) => s.get(k)),
       scrivi: (k, v) => tx("readwrite", (s) => s.put(v, k)),
-      elimina: (k) => tx("readwrite", (s) => s.delete(k))
+      elimina: (k) => tx("readwrite", (s) => s.delete(k)),
+      svuota: () => tx("readwrite", (s) => s.clear())
     };
   }
 
@@ -1469,10 +1484,38 @@
       });
     });
   }
-  function apriMenu(ancora, voci) {
+  function confermaDigitando({ titolo, testo: testo2, parola = "ELIMINA", etichetta = "Elimina definitivamente" }) {
+    return new Promise((ok) => {
+      let risolto = false;
+      const fine = (v) => {
+        if (!risolto) {
+          risolto = true;
+          ok(v);
+        }
+      };
+      const input = h("input", { type: "text", autocomplete: "off", spellcheck: "false", "aria-label": `Scrivi ${parola} per confermare`, placeholder: parola, classe: "input" });
+      const vai = h("button", { classe: "bottone pericolo pieno", type: "button", disabled: true, onClick: () => {
+        fine(true);
+        dlg.chiudi();
+      } }, etichetta);
+      input.addEventListener("input", () => {
+        vai.disabled = input.value.trim() !== parola;
+      });
+      input.addEventListener("keydown", (e) => {
+        if (e.key === "Enter" && !vai.disabled) vai.click();
+      });
+      const dlg = apriDialogo({
+        titolo,
+        onChiudi: () => fine(false),
+        corpo: h("div", { classe: "pila", style: "gap:14px" }, h("p", { classe: "muted" }, testo2), h("label", { classe: "etichetta" }, `Per confermare scrivi ${parola}`), input),
+        azioni: [h("button", { classe: "bottone", type: "button", onClick: () => dlg.chiudi() }, "Annulla"), vai]
+      });
+    });
+  }
+  function apriMenu(ancora, voci, { larghezza, allinea = "destra", sopra = false } = {}) {
     document.querySelectorAll(".menu-contestuale").forEach((m) => m.remove());
     const r = ancora.getBoundingClientRect();
-    const menu = h("div", { classe: "menu-contestuale", role: "menu" }, voci.map((v) => v === "sep" ? h("hr") : h("button", {
+    const menu = h("div", { classe: "menu-contestuale", role: "menu" }, voci.map((v) => v === "sep" ? h("hr") : v.intestazione ? h("div", { classe: "menu-titolo" }, v.testo) : h("button", {
       type: "button",
       role: "menuitem",
       classe: v.pericolo ? "pericolo" : "",
@@ -1481,10 +1524,13 @@
         v.onClick();
       }
     }, v.icona ? icona(v.icona, 16) : null, v.testo)));
+    if (larghezza) menu.style.width = `${Math.min(larghezza, window.innerWidth - 16)}px`;
     document.body.append(menu);
-    const larghezza = menu.offsetWidth;
-    menu.style.top = `${Math.min(r.bottom + 6, window.innerHeight - menu.offsetHeight - 8)}px`;
-    menu.style.left = `${Math.max(8, Math.min(r.right - larghezza, window.innerWidth - larghezza - 8))}px`;
+    const w2 = menu.offsetWidth;
+    const alto = sopra ? r.top - menu.offsetHeight - 6 : r.bottom + 6;
+    menu.style.top = `${Math.max(8, Math.min(alto, window.innerHeight - menu.offsetHeight - 8))}px`;
+    const x = allinea === "sinistra" ? r.left : r.right - w2;
+    menu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - w2 - 8))}px`;
     const chiudi2 = () => {
       menu.remove();
       document.removeEventListener("pointerdown", fuori, true);
@@ -1594,7 +1640,7 @@
     { path: "#/impostazioni", titolo: "Impostazioni", icona: "impostazioni", gruppo: "sistema" }
   ];
   var GRUPPI = { studio: "Studio", cliente: "Cliente", sistema: "Sistema" };
-  function costruisciShell(ctx, rotta, contenuto, { badgeAgenda = 0, azioni }) {
+  function costruisciShell(ctx, rotta, contenuto, { imminenti = [], azioni }) {
     const { cliente, dati } = ctx;
     let barra;
     const chiudiBarra = () => {
@@ -1605,37 +1651,52 @@
       barra.classList.add("aperta");
       document.body.append(h("div", { classe: "velo-barra", onClick: chiudiBarra }));
     };
-    const selettore = h(
-      "button",
-      { classe: "selettore-cliente", type: "button", "aria-haspopup": "menu", onClick: (e) => {
-        const voci = dati.clienti.map((c) => ({ testo: c.nome || "(senza nome)", icona: c.id === cliente?.id ? "spunta" : "utente", onClick: () => azioni.selezionaCliente(c.id) }));
-        apriMenu(e.currentTarget, [...voci, ...voci.length ? ["sep"] : [], { testo: "Tutti i clienti", icona: "utenti", onClick: () => azioni.naviga("#/clienti") }, { testo: "Nuovo cliente", icona: "piu", onClick: () => azioni.nuovoCliente() }]);
-      } },
-      h("span", { classe: "avatar" }, cliente ? iniziali(cliente.nome) : "+"),
-      h("span", { classe: "testi" }, h("strong", null, cliente ? cliente.nome || "(senza nome)" : "Nessun cliente"), h("span", null, cliente ? `${etichettaPrevidenza(cliente)}` : "Aggiungi il primo")),
-      icona("giu", 16)
-    );
+    const nomeStudio = ctx.studio.nome || "Studio professionale";
+    const perCliente = rotta.gruppo === "cliente";
     const voce = (r) => h(
       "a",
-      { classe: "nav-voce", href: r.path, "aria-current": r === rotta ? "page" : null, onClick: chiudiBarra },
-      icona(r.icona, 18),
-      r.titolo,
-      r.badge === "agenda" && badgeAgenda > 0 ? h("span", { classe: "badge attenzione", title: "Versamenti scaduti o in scadenza entro 14 giorni" }, badgeAgenda) : null
+      { classe: "nav-voce", href: r.path, "aria-current": r === rotta || perCliente && r.path === "#/clienti" ? "page" : null, onClick: chiudiBarra },
+      icona(r.icona, 17),
+      h("span", { classe: "nav-testo" }, r.titolo),
+      r.badge === "agenda" && imminenti.length > 0 ? h("span", { classe: "badge attenzione", title: "Versamenti scaduti o in scadenza entro 14 giorni" }, imminenti.length) : null
     );
     barra = h(
       "nav",
       { classe: "barra-laterale", "aria-label": "Navigazione principale" },
-      h("a", { classe: "marchio", href: "#/studio", onClick: chiudiBarra }, h("div", { classe: "logo" }, icona("bilancia", 19)), h("div", null, h("strong", null, "Gestione Forfettario"), h("span", null, ctx.studio.nome || "Studio professionale"))),
-      selettore,
-      ...Object.entries(GRUPPI).map(([g, titolo]) => h("div", { classe: "nav-gruppo" }, h("div", { classe: "nav-titolo" }, titolo), ROTTE.filter((r) => r.gruppo === g).map(voce))),
+      h(
+        "button",
+        { classe: "workspace", type: "button", "aria-haspopup": "menu", onClick: (e) => apriMenu(e.currentTarget, menuUtente(ctx, azioni), { larghezza: 232 }) },
+        h("div", { classe: "logo" }, icona("bilancia", 16)),
+        h("div", { classe: "workspace-testi" }, h("strong", null, nomeStudio), h("span", null, "Gestione Forfettario")),
+        icona("su-giu", 14)
+      ),
+      h("button", { classe: "cerca-rapida", type: "button", onClick: azioni.apriPalette }, icona("cerca", 15), "Cerca\u2026", h("kbd", null, navigator.platform?.includes("Mac") ? "\u2318K" : "Ctrl K")),
+      ...Object.entries(GRUPPI).filter(([g]) => g !== "cliente").map(([g, titolo]) => h("div", { classe: "nav-gruppo" }, h("div", { classe: "nav-titolo" }, titolo), ROTTE.filter((r) => r.gruppo === g).map(voce))),
       h(
         "div",
         { classe: "barra-fondo" },
-        h("div", { classe: "stato-sicuro" }, icona("lucchetto", 14), "Archivio cifrato in locale"),
-        h("button", { classe: "bottone", type: "button", style: "background:transparent;color:#c7d0e0;border-color:rgba(255,255,255,.18);box-shadow:none", onClick: azioni.blocca }, icona("lucchetto", 16), "Blocca archivio")
+        h("div", { classe: "stato-sicuro" }, icona("lucchetto", 13), h("span", null, "Cifrato in locale"), h("span", { classe: "stato-salvato", id: "stato-salvato" }, "Salvato")),
+        h(
+          "button",
+          { classe: "utente", type: "button", "aria-haspopup": "menu", onClick: (e) => apriMenu(e.currentTarget, menuUtente(ctx, azioni), { larghezza: 232, sopra: true }) },
+          h("span", { classe: "avatar" }, iniziali(nomeStudio)),
+          h("span", { classe: "workspace-testi" }, h("strong", null, nomeStudio), h("span", null, ctx.studio.email || "Account locale")),
+          icona("su-giu", 14)
+        )
       )
     );
-    const nomeRotta = rotta.gruppo === "cliente" && cliente ? h("span", { classe: "percorso" }, h("span", { classe: "cliente-nome" }, `${cliente.nome} /`), h("strong", null, rotta.titolo)) : h("span", { classe: "percorso" }, h("strong", null, rotta.titolo));
+    const percorso = perCliente && cliente ? h(
+      "nav",
+      { classe: "percorso", "aria-label": "Percorso" },
+      h("a", { href: "#/clienti" }, "Clienti"),
+      h("span", { classe: "sep" }, "/"),
+      h("button", { classe: "cambia-cliente", type: "button", "aria-haspopup": "menu", onClick: (e) => {
+        const voci = dati.clienti.map((c) => ({ testo: c.nome || "(senza nome)", icona: c.id === cliente.id ? "spunta" : "utente", onClick: () => azioni.selezionaCliente(c.id) }));
+        apriMenu(e.currentTarget, [...voci, "sep", { testo: "Tutti i clienti", icona: "utenti", onClick: () => azioni.naviga("#/clienti") }, { testo: "Nuovo cliente", icona: "piu", onClick: () => azioni.nuovoCliente() }], { allinea: "sinistra", larghezza: 260 });
+      } }, h("span", { classe: "avatar mini" }, iniziali(cliente.nome)), cliente.nome || "(senza nome)", icona("su-giu", 13)),
+      h("span", { classe: "sep" }, "/"),
+      h("strong", null, rotta.titolo)
+    ) : h("nav", { classe: "percorso", "aria-label": "Percorso" }, h("strong", null, rotta.titolo));
     const anno2 = h(
       "div",
       { classe: "selezione-anno", role: "group", "aria-label": "Anno di riferimento" },
@@ -1643,17 +1704,34 @@
       h("strong", { title: "Anno di riferimento" }, ctx.anno),
       h("button", { type: "button", "aria-label": "Anno successivo", onClick: () => azioni.impostaAnno(ctx.anno + 1) }, icona("chevronDx", 14))
     );
+    const campanella = h("button", { classe: "bottone ghost icona-sola campanella", type: "button", "aria-label": `Notifiche${imminenti.length ? `, ${imminenti.length} da gestire` : ""}`, title: "Scadenze imminenti", onClick: (e) => {
+      const voci = imminenti.length ? imminenti.slice(0, 6).map((v) => ({ testo: `${dataIt(v.data)} \xB7 ${v.cliente.nome.split(" ")[0]} \xB7 ${v.descrizione}`, icona: v.data < ctx.oggi ? "avviso" : "calendario", onClick: () => azioni.naviga("#/agenda") })) : [{ testo: "Nessun versamento in scadenza a breve", icona: "spunta", onClick: () => {
+      } }];
+      apriMenu(e.currentTarget, [{ testo: "Scadenze entro 14 giorni", intestazione: true }, ...voci, "sep", { testo: "Apri agenda scadenze", icona: "calendario", onClick: () => azioni.naviga("#/agenda") }], { larghezza: 380 });
+    } }, icona("campana", 18), imminenti.length ? h("span", { classe: "punto-notifica" }) : null);
     const topbar = h(
       "header",
       { classe: "topbar" },
       h("button", { classe: "bottone ghost icona-sola pulsante-menu", type: "button", "aria-label": "Apri il menu", onClick: apriBarra }, icona("menu", 20)),
-      nomeRotta,
+      percorso,
       h("span", { classe: "spaziatore" }),
-      h("button", { classe: "pulsante-cerca", type: "button", onClick: azioni.apriPalette, "aria-label": "Cerca" }, icona("cerca", 16), h("span", { classe: "testo-cerca" }, "Cerca\u2026"), h("kbd", null, navigator.platform?.includes("Mac") ? "\u2318K" : "Ctrl K")),
+      h("button", { classe: "pulsante-cerca-mobile bottone ghost icona-sola", type: "button", "aria-label": "Cerca", onClick: azioni.apriPalette }, icona("cerca", 18)),
       anno2,
+      campanella,
       h("button", { classe: "bottone ghost icona-sola", type: "button", title: "Cambia tema", "aria-label": "Cambia tema", onClick: azioni.cambiaTema }, icona(azioni.temaScuro() ? "sole" : "luna", 18))
     );
-    return h("div", { classe: "app" }, barra, h("div", { classe: "colonna-principale" }, topbar, h("main", { classe: "contenuto", id: "contenuto" }, contenuto)));
+    const schede = perCliente && cliente ? h("div", { classe: "sottobarra" }, h("nav", { classe: "schede", "aria-label": "Sezioni del cliente" }, ROTTE.filter((r) => r.gruppo === "cliente").map((r) => h("a", { href: r.path, classe: "scheda-nav", "aria-current": r === rotta ? "page" : null }, icona(r.icona, 15), r.titolo)))) : null;
+    return h("div", { classe: "app" }, barra, h("div", { classe: "colonna-principale" }, topbar, schede, h("main", { classe: "contenuto", id: "contenuto" }, contenuto)));
+  }
+  function menuUtente(ctx, azioni) {
+    return [
+      { testo: "Impostazioni dello studio", icona: "impostazioni", onClick: () => azioni.naviga("#/impostazioni") },
+      { testo: "Backup e sicurezza", icona: "scudo", onClick: () => azioni.naviga("#/sicurezza") },
+      { testo: azioni.temaScuro() ? "Tema chiaro" : "Tema scuro", icona: azioni.temaScuro() ? "sole" : "luna", onClick: azioni.cambiaTema },
+      "sep",
+      { testo: "Blocca archivio", icona: "lucchetto", onClick: azioni.blocca },
+      { testo: "Elimina archivio e riparti\u2026", icona: "cestino", pericolo: true, onClick: azioni.elimina }
+    ];
   }
   function etichettaPrevidenza(c) {
     const t = { "gestione-separata": "Gestione Separata", artigiani: "Artigiani", commercianti: "Commercianti", cassa: "Cassa professionale" };
@@ -1661,7 +1739,7 @@
   }
 
   // js/ui/viste/sblocco.js
-  function schermataSblocco(archivio2, esiste, alSbloccato, { alCreare } = {}) {
+  function schermataSblocco(archivio2, esiste, alSbloccato, { alCreare, alEliminare } = {}) {
     const pw = h("input", { type: "password", autocomplete: esiste ? "current-password" : "new-password", required: true, minlength: esiste ? null : 10, autofocus: true });
     const pw2 = h("input", { type: "password", autocomplete: "new-password", required: true });
     const demo = h("input", { type: "checkbox", checked: true });
@@ -1705,18 +1783,32 @@
       h(
         "div",
         { classe: "sblocco-vetrina" },
-        h("div", { classe: "marchio" }, h("div", { classe: "logo" }, icona("bilancia", 20)), h("div", null, h("strong", null, "Gestione Forfettario"), h("span", null, "per studi professionali"))),
+        h("div", { classe: "vetrina-marchio" }, h("div", { classe: "logo" }, icona("bilancia", 16)), "Gestione Forfettario"),
         h(
           "div",
           null,
-          h("h1", null, "Il regime forfettario sotto controllo."),
+          h("h1", null, "Il regime forfettario, sotto controllo."),
+          h("p", { classe: "lead" }, "Soglie, acconti e scadenze di tutti i clienti dello studio in un\u2019unica vista, con parametri fiscali verificati sulle fonti ufficiali."),
           h(
-            "ul",
-            null,
-            ["Soglie, acconti e scadenze di tutti i clienti in un colpo d\u2019occhio", "Confronto forfettario e ordinario con scenari what-if", "Fatture in CSV e XML FatturaPA, prospetti in PDF", "Parametri fiscali verificati su fonti ufficiali, con la fonte accanto"].map((t) => h("li", null, icona("spunta", 18), t))
+            "div",
+            { classe: "anteprima", "aria-hidden": "true", style: "margin-top:28px" },
+            h(
+              "div",
+              { classe: "anteprima-kpi" },
+              h("div", null, h("span", null, "Clienti seguiti"), h("strong", null, "7")),
+              h("div", null, h("span", null, "Ricavi incassati"), h("strong", null, "361.780 \u20AC")),
+              h("div", null, h("span", null, "Prossima scadenza"), h("strong", null, "16/11"))
+            ),
+            [["Andrea Sala", 100], ["Paolo Mancini", 95], ["Marta Conti", 64], ["Elena Rizzi", 54]].map(([n, v]) => h("div", { classe: "anteprima-riga" }, h("span", null, n), h("i", null, h("b", { style: `width:${v}%` })), h("span", null, `${v}%`)))
           )
         ),
-        h("div", { classe: "piccolo", style: "color:#7e8ba2;display:flex;gap:8px;align-items:center" }, icona("lucchetto", 14), "I dati restano nel tuo browser, cifrati con AES-256. Nessun server.")
+        h(
+          "div",
+          { classe: "vetrina-punti" },
+          h("span", null, icona("lucchetto", 14), "Cifratura AES-256 nel browser"),
+          h("span", null, icona("scudo", 14), "Nessun server, nessun invio di dati"),
+          h("span", null, icona("documento", 14), "CSV, XML FatturaPA e PDF")
+        )
       ),
       h(
         "div",
@@ -1731,6 +1823,7 @@
             h("p", { classe: "muted", style: "margin-top:6px" }, esiste ? "Inserisci la password per aprire i dati dello studio." : "Primo avvio: scegli una password per proteggere i dati dei clienti.")
           ),
           form,
+          esiste && alEliminare ? h("div", { classe: "recupero" }, h("span", null, "Password dimenticata? Non \xE8 recuperabile."), h("button", { classe: "link-pericolo", type: "button", onClick: alEliminare }, "Elimina l\u2019archivio e riparti da zero")) : null,
           h("div", null, chip("neutro", "AES-256-GCM", "scudo"), " ", chip("neutro", "PBKDF2 600.000 iterazioni"))
         )
       )
@@ -3951,6 +4044,29 @@ ${v.nota}` : v.descrizione, f24(v), v.tipo === "adempimento" ? "" : eurPdf(v.imp
             avviso("info", "Password non recuperabile.", "Non esiste un reset: senza la password i dati non si possono leggere. Conserva un backup e la password in luoghi sicuri.")
           )
         )
+      ),
+      scheda(
+        { titolo: "Zona pericolosa", sottotitolo: "Azioni irreversibili", classe: "scheda-pericolo" },
+        h(
+          "div",
+          { classe: "riga-pericolo" },
+          h(
+            "div",
+            null,
+            h("strong", null, "Elimina tutto l\u2019archivio e riparti da zero"),
+            h("p", { classe: "muted" }, "Cancella dal browser clienti, fatture, spese, impostazioni e password. Dopo l\u2019eliminazione l\u2019app torna alla schermata di primo avvio. Scarica prima un backup se vuoi poter tornare indietro.")
+          ),
+          h(
+            "div",
+            { classe: "gruppo-azioni" },
+            bottone("Scarica backup", { icona: "scarica", onClick: async () => {
+              const b = await archivio2.esporta();
+              scarica(`gestione-forfettario-${(/* @__PURE__ */ new Date()).toISOString().slice(0, 10)}.json`, JSON.stringify(b));
+              ctx.toast("Backup scaricato.");
+            } }),
+            bottone("Elimina archivio\u2026", { variante: "pericolo", icona: "cestino", onClick: () => ctx.eliminaArchivio() })
+          )
+        )
       )
     );
   }
@@ -4084,6 +4200,22 @@ ${v.nota}` : v.descrizione, f24(v), v.tipo === "adempimento" ? "" : eurPdf(v.imp
       c.pagati ?? (c.pagati = {});
     }
   }
+  async function eliminaArchivio() {
+    const ok = await confermaDigitando({
+      titolo: "Eliminare tutto l\u2019archivio?",
+      testo: "Verranno cancellati definitivamente clienti, fatture, spese, impostazioni e la password. L\u2019operazione non si pu\xF2 annullare: se non hai un backup, i dati sono persi."
+    });
+    if (!ok) return false;
+    await archivio.elimina();
+    try {
+      localStorage.removeItem("gf-tema");
+    } catch {
+    }
+    for (const k of Object.keys(stato)) delete stato[k];
+    history.replaceState(null, "", location.pathname + location.search);
+    toast("Archivio eliminato. Puoi ripartire da zero.");
+    return true;
+  }
   function costruisciCtx() {
     const dati = archivio.dati;
     const anno2 = dati.ui.anno ?? (/* @__PURE__ */ new Date()).getFullYear();
@@ -4104,6 +4236,7 @@ ${v.nota}` : v.descrizione, f24(v), v.tipo === "adempimento" ? "" : eurPdf(v.imp
       },
       toast,
       conferma,
+      eliminaArchivio,
       /** Riepilogo di un cliente per un anno, con i parametri corretti per anno. */
       riepilogo: (c = cliente, a = anno2) => riepilogoAnno(c, dati, a, parametriPerAnno(a).params, { paramsPrec: parametriPerAnno(a - 1).params }),
       selezionaCliente: async (id2, dest) => {
@@ -4158,6 +4291,7 @@ ${v.nota}` : v.descrizione, f24(v), v.tipo === "adempimento" ? "" : eurPdf(v.imp
       d.ui.anno = a;
     }),
     blocca: () => archivio.blocca(),
+    elimina: () => eliminaArchivio(),
     apriPalette: () => apriPalette(comandiPalette),
     cambiaTema: async () => {
       const nuovo = temaScuroAttivo() ? "chiaro" : "scuro";
@@ -4187,7 +4321,8 @@ ${v.nota}` : v.descrizione, f24(v), v.tipo === "adempimento" ? "" : eurPdf(v.imp
         disegna();
       } },
       { testo: "Cambia tema chiaro / scuro", gruppo: "Azione", icona: "luna", esegui: azioniShell().cambiaTema },
-      { testo: "Blocca archivio", gruppo: "Azione", icona: "lucchetto", esegui: () => archivio.blocca() }
+      { testo: "Blocca archivio", gruppo: "Azione", icona: "lucchetto", esegui: () => archivio.blocca() },
+      { testo: "Elimina tutto l\u2019archivio e riparti da zero", gruppo: "Azione", icona: "cestino", esegui: eliminaArchivio }
     ];
     return [...pagine, ...clienti, ...azioni];
   }
@@ -4198,9 +4333,13 @@ ${v.nota}` : v.descrizione, f24(v), v.tipo === "adempimento" ? "" : eurPdf(v.imp
     const contenuto = rotta.gruppo === "cliente" && !ctx.cliente ? h("div", null, VISTE["#/clienti"](ctx)) : VISTE[rotta.path](ctx);
     const imminenti = agendaStudio(archivio.dati, ctx.anno, parametriPerAnno, { soloFuture: false, oggi: ctx.oggi }).filter((v) => v.importo > 0 && !v.versata && v.tipo !== "adempimento" && v.data <= aggiungiGiorni2(ctx.oggi, 14) && v.data >= `${ctx.anno}-01-01`);
     const scrollY = window.scrollY;
-    radice.replaceChildren(costruisciShell(ctx, rotta, contenuto, { badgeAgenda: imminenti.length, azioni: azioniShell() }));
-    window.scrollTo(0, location.hash === stato.ultimaRotta ? scrollY : 0);
+    const cambiaRotta = location.hash !== stato.ultimaRotta;
+    radice.replaceChildren(costruisciShell(ctx, rotta, contenuto, { imminenti, azioni: azioniShell() }));
+    if (cambiaRotta) document.getElementById("contenuto")?.classList.add("entra");
+    window.scrollTo(0, cambiaRotta ? 0 : scrollY);
     stato.ultimaRotta = location.hash;
+    const etSalvato = document.getElementById("stato-salvato");
+    if (etSalvato && stato.salvatoAlle) etSalvato.textContent = `Salvato ${stato.salvatoAlle.toLocaleTimeString("it-IT", { hour: "2-digit", minute: "2-digit" })}`;
     document.title = `${rotta.titolo} \xB7 Gestione Forfettario`;
   }
   var aggiungiGiorni2 = (iso3, n) => {
@@ -4213,6 +4352,7 @@ ${v.nota}` : v.descrizione, f24(v), v.tipo === "adempimento" ? "" : eurPdf(v.imp
     applicaTema(leggiTemaLocale());
     const esiste = await archivio.esiste();
     radice.replaceChildren(schermataSblocco(archivio, esiste, avviaSessione, {
+      alEliminare: eliminaArchivio,
       alCreare: async ({ conDemo }) => {
         normalizza(archivio.dati);
         if (conDemo) await costruisciCtx().caricaDemo();
@@ -4243,6 +4383,7 @@ ${v.nota}` : v.descrizione, f24(v), v.tipo === "adempimento" ? "" : eurPdf(v.imp
   var modificaOriginale = archivio.modifica.bind(archivio);
   archivio.modifica = async (fn) => {
     const r = await modificaOriginale(fn);
+    stato.salvatoAlle = /* @__PURE__ */ new Date();
     disegna();
     return r;
   };

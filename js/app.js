@@ -8,7 +8,7 @@ import { scadenzarioCliente } from './domain/scadenze-cliente.js';
 import { generaDemo } from './domain/demo.js';
 import { nuovoCliente } from './domain/modello.js';
 import { costruisciShell, ROTTE } from './ui/shell.js';
-import { apriPalette, toast, conferma } from './ui/overlay.js';
+import { apriPalette, toast, conferma, confermaDigitando } from './ui/overlay.js';
 import { schermataSblocco } from './ui/viste/sblocco.js';
 import { vistaStudio } from './ui/viste/studio.js';
 import { vistaClienti } from './ui/viste/clienti.js';
@@ -58,6 +58,21 @@ function normalizza(d) {
   for (const c of d.clienti) { c.scadenzeCassa ??= []; c.versamenti ??= {}; c.pagati ??= {}; }
 }
 
+/** Eliminazione totale: cancella l'archivio cifrato e riporta l'app al primo avvio. */
+async function eliminaArchivio() {
+  const ok = await confermaDigitando({
+    titolo: 'Eliminare tutto l’archivio?',
+    testo: 'Verranno cancellati definitivamente clienti, fatture, spese, impostazioni e la password. L’operazione non si può annullare: se non hai un backup, i dati sono persi.',
+  });
+  if (!ok) return false;
+  await archivio.elimina();
+  try { localStorage.removeItem('gf-tema'); } catch { /* ambiente senza storage */ }
+  for (const k of Object.keys(stato)) delete stato[k];
+  history.replaceState(null, '', location.pathname + location.search);
+  toast('Archivio eliminato. Puoi ripartire da zero.');
+  return true;
+}
+
 // ---- Contesto passato alle viste ----
 function costruisciCtx() {
   const dati = archivio.dati;
@@ -69,7 +84,7 @@ function costruisciCtx() {
     ...parametriPerAnno(anno),
     aggiorna: disegna,
     naviga: (p) => { location.hash = p; },
-    toast, conferma,
+    toast, conferma, eliminaArchivio,
     /** Riepilogo di un cliente per un anno, con i parametri corretti per anno. */
     riepilogo: (c = cliente, a = anno) => riepilogoAnno(c, dati, a, parametriPerAnno(a).params, { paramsPrec: parametriPerAnno(a - 1).params }),
     selezionaCliente: async (id, dest) => { await archivio.modifica((d) => { d.ui.clienteId = id; }); if (dest) location.hash = dest; },
@@ -105,6 +120,7 @@ const azioniShell = () => ({
   nuovoCliente: () => costruisciCtx().nuovoCliente(),
   impostaAnno: (a) => archivio.modifica((d) => { d.ui.anno = a; }),
   blocca: () => archivio.blocca(),
+  elimina: () => eliminaArchivio(),
   apriPalette: () => apriPalette(comandiPalette),
   cambiaTema: async () => { const nuovo = temaScuroAttivo() ? 'chiaro' : 'scuro'; applicaTema(nuovo); await archivio.modifica((d) => { d.ui.tema = nuovo; }); },
   temaScuro: temaScuroAttivo,
@@ -119,6 +135,7 @@ function comandiPalette() {
     { testo: 'Nuova fattura', gruppo: 'Azione', icona: 'documento', esegui: () => { stato.nuovaFattura = true; location.hash = '#/fatture'; disegna(); } },
     { testo: 'Cambia tema chiaro / scuro', gruppo: 'Azione', icona: 'luna', esegui: azioniShell().cambiaTema },
     { testo: 'Blocca archivio', gruppo: 'Azione', icona: 'lucchetto', esegui: () => archivio.blocca() },
+    { testo: 'Elimina tutto l’archivio e riparti da zero', gruppo: 'Azione', icona: 'cestino', esegui: eliminaArchivio },
   ];
   return [...pagine, ...clienti, ...azioni];
 }
@@ -134,9 +151,13 @@ function disegna() {
   const imminenti = agendaStudio(archivio.dati, ctx.anno, parametriPerAnno, { soloFuture: false, oggi: ctx.oggi })
     .filter((v) => v.importo > 0 && !v.versata && v.tipo !== 'adempimento' && v.data <= aggiungiGiorni(ctx.oggi, 14) && v.data >= `${ctx.anno}-01-01`);
   const scrollY = window.scrollY;
-  radice.replaceChildren(costruisciShell(ctx, rotta, contenuto, { badgeAgenda: imminenti.length, azioni: azioniShell() }));
-  window.scrollTo(0, location.hash === stato.ultimaRotta ? scrollY : 0);
+  const cambiaRotta = location.hash !== stato.ultimaRotta;
+  radice.replaceChildren(costruisciShell(ctx, rotta, contenuto, { imminenti, azioni: azioniShell() }));
+  if (cambiaRotta) document.getElementById('contenuto')?.classList.add('entra');
+  window.scrollTo(0, cambiaRotta ? 0 : scrollY);
   stato.ultimaRotta = location.hash;
+  const etSalvato = document.getElementById('stato-salvato');
+  if (etSalvato && stato.salvatoAlle) etSalvato.textContent = `Salvato ${stato.salvatoAlle.toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })}`;
   document.title = `${rotta.titolo} · Gestione Forfettario`;
 }
 
@@ -147,6 +168,7 @@ async function mostraSblocco() {
   applicaTema(leggiTemaLocale());
   const esiste = await archivio.esiste();
   radice.replaceChildren(schermataSblocco(archivio, esiste, avviaSessione, {
+    alEliminare: eliminaArchivio,
     alCreare: async ({ conDemo }) => { normalizza(archivio.dati); if (conDemo) await costruisciCtx().caricaDemo(); },
   }));
   document.title = 'Gestione Forfettario';
@@ -174,7 +196,7 @@ function riparti() {
 // ---- Avvio ----
 archivio.ascolta(() => { if (!archivio.sbloccato) mostraSblocco(); });
 const modificaOriginale = archivio.modifica.bind(archivio);
-archivio.modifica = async (fn) => { const r = await modificaOriginale(fn); disegna(); return r; };
+archivio.modifica = async (fn) => { const r = await modificaOriginale(fn); stato.salvatoAlle = new Date(); disegna(); return r; };
 window.addEventListener('hashchange', () => { if (archivio.sbloccato) disegna(); });
 document.addEventListener('keydown', (e) => {
   if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k' && archivio.sbloccato) { e.preventDefault(); apriPalette(comandiPalette); }

@@ -72,18 +72,38 @@ export function conferma({ titolo, testo, etichetta = 'Conferma', pericolo = fal
   });
 }
 
+/** Conferma rafforzata per azioni irreversibili: abilita il pulsante solo se si digita la parola richiesta. */
+export function confermaDigitando({ titolo, testo, parola = 'ELIMINA', etichetta = 'Elimina definitivamente' }) {
+  return new Promise((ok) => {
+    let risolto = false;
+    const fine = (v) => { if (!risolto) { risolto = true; ok(v); } };
+    const input = h('input', { type: 'text', autocomplete: 'off', spellcheck: 'false', 'aria-label': `Scrivi ${parola} per confermare`, placeholder: parola, classe: 'input' });
+    const vai = h('button', { classe: 'bottone pericolo pieno', type: 'button', disabled: true, onClick: () => { fine(true); dlg.chiudi(); } }, etichetta);
+    input.addEventListener('input', () => { vai.disabled = input.value.trim() !== parola; });
+    input.addEventListener('keydown', (e) => { if (e.key === 'Enter' && !vai.disabled) vai.click(); });
+    const dlg = apriDialogo({
+      titolo, onChiudi: () => fine(false),
+      corpo: h('div', { classe: 'pila', style: 'gap:14px' }, h('p', { classe: 'muted' }, testo), h('label', { classe: 'etichetta' }, `Per confermare scrivi ${parola}`), input),
+      azioni: [h('button', { classe: 'bottone', type: 'button', onClick: () => dlg.chiudi() }, 'Annulla'), vai],
+    });
+  });
+}
+
 /** Menu contestuale ancorato a un elemento. voci: [{testo, icona, onClick, pericolo}] o 'sep'. */
-export function apriMenu(ancora, voci) {
+export function apriMenu(ancora, voci, { larghezza, allinea = 'destra', sopra = false } = {}) {
   document.querySelectorAll('.menu-contestuale').forEach((m) => m.remove());
   const r = ancora.getBoundingClientRect();
-  const menu = h('div', { classe: 'menu-contestuale', role: 'menu' }, voci.map((v) => (v === 'sep' ? h('hr') : h('button', {
+  const menu = h('div', { classe: 'menu-contestuale', role: 'menu' }, voci.map((v) => (v === 'sep' ? h('hr') : v.intestazione ? h('div', { classe: 'menu-titolo' }, v.testo) : h('button', {
     type: 'button', role: 'menuitem', classe: v.pericolo ? 'pericolo' : '',
     onClick: () => { chiudi(); v.onClick(); },
   }, v.icona ? icona(v.icona, 16) : null, v.testo))));
+  if (larghezza) menu.style.width = `${Math.min(larghezza, window.innerWidth - 16)}px`;
   document.body.append(menu);
-  const larghezza = menu.offsetWidth;
-  menu.style.top = `${Math.min(r.bottom + 6, window.innerHeight - menu.offsetHeight - 8)}px`;
-  menu.style.left = `${Math.max(8, Math.min(r.right - larghezza, window.innerWidth - larghezza - 8))}px`;
+  const w = menu.offsetWidth;
+  const alto = sopra ? r.top - menu.offsetHeight - 6 : r.bottom + 6;
+  menu.style.top = `${Math.max(8, Math.min(alto, window.innerHeight - menu.offsetHeight - 8))}px`;
+  const x = allinea === 'sinistra' ? r.left : r.right - w;
+  menu.style.left = `${Math.max(8, Math.min(x, window.innerWidth - w - 8))}px`;
   const chiudi = () => { menu.remove(); document.removeEventListener('pointerdown', fuori, true); document.removeEventListener('keydown', tasto, true); };
   const fuori = (e) => { if (!menu.contains(e.target)) chiudi(); };
   const tasto = (e) => { if (e.key === 'Escape') { e.stopPropagation(); chiudi(); ancora.focus(); } if (e.key === 'ArrowDown' || e.key === 'ArrowUp') { e.preventDefault(); const b = [...menu.querySelectorAll('button')]; const i = b.indexOf(document.activeElement); b[(i + (e.key === 'ArrowDown' ? 1 : -1) + b.length) % b.length].focus(); } };

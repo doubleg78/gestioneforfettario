@@ -1,110 +1,84 @@
-/* Token di stile. Palette dei grafici (teal / arancio) validata con lo script di dataviz, chiaro e scuro. */
+/* Token di stile. Neutri "zinc", un solo colore di marca (indaco), stati semantici separati.
+   Palette dei grafici (indaco / arancio) validata con lo script di dataviz, chiaro e scuro. */
 :root {
-  --sfondo: #f5f6f8;
+  --sfondo: #f6f6f8;
   --card: #ffffff;
-  --card-2: #fafbfc;
-  --ink: #0f1722;
-  --ink-2: #3a4556;
-  --muted: #637086;
-  --line: #e3e7ee;
-  --line-forte: #cdd5e1;
+  --card-2: #fafafb;
+  --ink: #17181c;
+  --ink-2: #3f424a;
+  --muted: #6b6f7a;
+  --line: #e6e7eb;
+  --line-forte: #d3d5db;
 
-  --primario: #0f766e;
-  --primario-hover: #0b5f58;
+  --primario: #4f46e5;
+  --primario-hover: #4338ca;
   --primario-testo: #ffffff;
-  --primario-wash: #e5f4f1;
-  --focus: #1d6fe0;
+  --primario-wash: #eeefff;
+  --focus: #4f46e5;
 
-  --barra: #0b1220;
-  --barra-testo: #aab6cb;
-  --barra-forte: #ffffff;
-  --barra-hover: rgba(255, 255, 255, .07);
-  --barra-attivo: rgba(45, 212, 191, .14);
-  --barra-accento: #2dd4bf;
-  --barra-line: rgba(255, 255, 255, .09);
+  --barra: #fbfbfc;
+  --barra-testo: #4b4f59;
+  --barra-forte: #17181c;
+  --barra-hover: rgba(23, 24, 28, .05);
+  --barra-attivo: #ececf2;
+  --barra-accento: #4f46e5;
+  --barra-line: #e6e7eb;
+  --barra-titolo: #8a8e99;
 
-  --ok: #137a43;         --ok-sfondo: #e4f5ea;
-  --attenzione: #8a5300; --attenzione-sfondo: #fff2d4;
-  --errore: #b42318;     --errore-sfondo: #fdeae8;
-  --info: #1b56a5;       --info-sfondo: #e6effa;
+  --ok: #157f45;         --ok-sfondo: #e7f6ed;
+  --attenzione: #92580a; --attenzione-sfondo: #fdf1da;
+  --errore: #c1271b;     --errore-sfondo: #fdeceb;
+  --info: #1d5fb8;       --info-sfondo: #e8f0fb;
 
-  --serie-1: #0d9488;
+  --serie-1: #4f46e5;
   --serie-2: #e8672a;
-  --griglia: #e8ecf2;
-  --asse: #b6c0d0;
-  --tick: #637086;
-  --riferimento: #b42318;
+  --griglia: #ececf0;
+  --asse: #c4c7cf;
+  --tick: #6b6f7a;
+  --riferimento: #c1271b;
 
   --font: "Inter", system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
   --raggio-sm: 6px;
-  --raggio: 10px;
-  --raggio-lg: 14px;
-  --ombra-1: 0 1px 2px rgba(15, 23, 34, .05);
-  --ombra-2: 0 2px 8px rgba(15, 23, 34, .07);
-  --ombra-overlay: 0 18px 50px rgba(8, 15, 28, .28);
-  --larghezza-barra: 264px;
-  --altezza-topbar: 60px;
-  --transizione: 140ms cubic-bezier(.2, .7, .3, 1);
+  --raggio: 8px;
+  --raggio-lg: 12px;
+  --ombra-1: 0 1px 0 rgba(17, 18, 24, .03);
+  --ombra-2: 0 1px 3px rgba(17, 18, 24, .08), 0 1px 2px rgba(17, 18, 24, .04);
+  --ombra-overlay: 0 0 0 1px rgba(17, 18, 24, .06), 0 16px 40px rgba(17, 18, 24, .18), 0 4px 10px rgba(17, 18, 24, .08);
+  --larghezza-barra: 248px;
+  --altezza-topbar: 56px;
+  --transizione: 120ms cubic-bezier(.2, .7, .3, 1);
 }
 
 @media (prefers-color-scheme: dark) {
   :root:not([data-tema="chiaro"]) {
-    --sfondo: #090e17;
-    --card: #101827;
-    --card-2: #0d1522;
-    --ink: #e8edf5;
-    --ink-2: #c3ccdb;
-    --muted: #8f9db3;
-    --line: #1d283b;
-    --line-forte: #2b394f;
-    --primario: #2dd4bf;
-    --primario-hover: #5eead4;
-    --primario-testo: #04201c;
-    --primario-wash: #0f2a2a;
-    --focus: #6ea8ff;
-    --barra: #060a12;
-    --ok: #5ed08f;         --ok-sfondo: #11291d;
+    --sfondo: #0b0c0f; --card: #131419; --card-2: #101115;
+    --ink: #ececf1; --ink-2: #c6c8d1; --muted: #8c909c;
+    --line: #22242b; --line-forte: #31343d;
+    --primario: #818cf8; --primario-hover: #a5b4fc; --primario-testo: #0d0f24; --primario-wash: #1b1d3a; --focus: #a5b4fc;
+    --barra: #0e0f13; --barra-testo: #a3a7b3; --barra-forte: #f2f2f6; --barra-hover: rgba(255, 255, 255, .06); --barra-attivo: #1c1d25; --barra-accento: #818cf8; --barra-line: #22242b; --barra-titolo: #6f7380;
+    --ok: #5ed08f; --ok-sfondo: #11291d;
     --attenzione: #f0b44f; --attenzione-sfondo: #33260a;
-    --errore: #ff8f86;     --errore-sfondo: #38161a;
-    --info: #86bdf5;       --info-sfondo: #10253d;
-    --serie-1: #1fa396;
-    --serie-2: #d95926;
-    --griglia: #1b2638;
-    --asse: #3a4a66;
-    --tick: #8f9db3;
-    --riferimento: #ff8f86;
-    --ombra-1: none;
-    --ombra-2: none;
-    --ombra-overlay: 0 18px 50px rgba(0, 0, 0, .6);
+    --errore: #ff8f86; --errore-sfondo: #38161a;
+    --info: #86bdf5; --info-sfondo: #10253d;
+    --serie-1: #6d73f0; --serie-2: #d95926;
+    --griglia: #1c1e25; --asse: #3a3d48; --tick: #8c909c; --riferimento: #ff8f86;
+    --ombra-1: none; --ombra-2: none;
+    --ombra-overlay: 0 0 0 1px rgba(255, 255, 255, .06), 0 18px 50px rgba(0, 0, 0, .65);
   }
 }
 
 :root[data-tema="scuro"] {
-  --sfondo: #090e17;
-  --card: #101827;
-  --card-2: #0d1522;
-  --ink: #e8edf5;
-  --ink-2: #c3ccdb;
-  --muted: #8f9db3;
-  --line: #1d283b;
-  --line-forte: #2b394f;
-  --primario: #2dd4bf;
-  --primario-hover: #5eead4;
-  --primario-testo: #04201c;
-  --primario-wash: #0f2a2a;
-  --focus: #6ea8ff;
-  --barra: #060a12;
-  --ok: #5ed08f;         --ok-sfondo: #11291d;
+  --sfondo: #0b0c0f; --card: #131419; --card-2: #101115;
+  --ink: #ececf1; --ink-2: #c6c8d1; --muted: #8c909c;
+  --line: #22242b; --line-forte: #31343d;
+  --primario: #818cf8; --primario-hover: #a5b4fc; --primario-testo: #0d0f24; --primario-wash: #1b1d3a; --focus: #a5b4fc;
+  --barra: #0e0f13; --barra-testo: #a3a7b3; --barra-forte: #f2f2f6; --barra-hover: rgba(255, 255, 255, .06); --barra-attivo: #1c1d25; --barra-accento: #818cf8; --barra-line: #22242b; --barra-titolo: #6f7380;
+  --ok: #5ed08f; --ok-sfondo: #11291d;
   --attenzione: #f0b44f; --attenzione-sfondo: #33260a;
-  --errore: #ff8f86;     --errore-sfondo: #38161a;
-  --info: #86bdf5;       --info-sfondo: #10253d;
-  --serie-1: #1fa396;
-  --serie-2: #d95926;
-  --griglia: #1b2638;
-  --asse: #3a4a66;
-  --tick: #8f9db3;
-  --riferimento: #ff8f86;
-  --ombra-1: none;
-  --ombra-2: none;
-  --ombra-overlay: 0 18px 50px rgba(0, 0, 0, .6);
+  --errore: #ff8f86; --errore-sfondo: #38161a;
+  --info: #86bdf5; --info-sfondo: #10253d;
+  --serie-1: #6d73f0; --serie-2: #d95926;
+  --griglia: #1c1e25; --asse: #3a3d48; --tick: #8c909c; --riferimento: #ff8f86;
+  --ombra-1: none; --ombra-2: none;
+  --ombra-overlay: 0 0 0 1px rgba(255, 255, 255, .06), 0 18px 50px rgba(0, 0, 0, .65);
 }

@@ -6,6 +6,7 @@ export function adattatoreMemoria() {
     async leggi(k) { return m.get(k) ?? null; },
     async scrivi(k, v) { m.set(k, structuredClone(v)); },
     async elimina(k) { m.delete(k); },
+    async svuota() { m.clear(); },
   };
 }
 
@@ -29,5 +30,6 @@ export function adattatoreIndexedDB(nome = 'gestione-forfettario') {
     leggi: (k) => tx('readonly', (s) => s.get(k)),
     scrivi: (k, v) => tx('readwrite', (s) => s.put(v, k)),
     elimina: (k) => tx('readwrite', (s) => s.delete(k)),
+    svuota: () => tx('readwrite', (s) => s.clear()),
   };
 }

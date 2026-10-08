@@ -44,6 +44,19 @@ export class Archivio {
     await this.salva();
   }
 
+  /**
+   * Eliminazione totale: cancella dal database il blocco cifrato e tutto il resto, senza chiedere la password
+   * (serve anche a chi l'ha dimenticata). Dopo la chiamata l'archivio è come al primo avvio.
+   */
+  async elimina() {
+    await this._coda;
+    await this.adattatore.svuota();
+    this.sessione = null;
+    this.dati = null;
+    this._coda = Promise.resolve();
+    this._notifica();
+  }
+
   blocca() { this.sessione = null; this.dati = null; this._notifica(); }
 
   /** Modifica i dati e salva (serializzato, nessun salvataggio perso). */

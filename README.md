@@ -28,7 +28,8 @@ I PDF si generano con jsPDF e AutoTable caricati da cdnjs al primo uso (richiede
 ## Dati e sicurezza
 
 - Tutti i dati restano nel browser (IndexedDB), cifrati con AES-256-GCM; la chiave deriva dalla password con PBKDF2-SHA256 (600.000 iterazioni).
-- La password non è recuperabile. Esporta regolarmente il backup cifrato dalla sezione *Sicurezza*.
+- La password non è recuperabile. Esporta regolarmente il backup cifrato dalla sezione *Backup e sicurezza*.
+- Per ripartire da zero: *Backup e sicurezza → Zona pericolosa → Elimina archivio* (o il link nella schermata di blocco). Cancella tutto in modo definitivo, anche senza password.
 - Blocco automatico dopo 15 minuti di inattività.
 
 ## Struttura

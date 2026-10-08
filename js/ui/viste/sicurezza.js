@@ -44,5 +44,12 @@ export function vistaSicurezza(ctx) {
         h('div', null, bottone('Cambia password', { variante: 'primario', tipo: 'submit' })))),
       scheda({ titolo: 'Blocco automatico', sottotitolo: 'Richiede di nuovo la password dopo un periodo di inattività' },
         h('div', { classe: 'pila', style: 'gap:14px' }, campo('Blocca dopo', min),
-          avviso('info', 'Password non recuperabile.', 'Non esiste un reset: senza la password i dati non si possono leggere. Conserva un backup e la password in luoghi sicuri.')))));
+          avviso('info', 'Password non recuperabile.', 'Non esiste un reset: senza la password i dati non si possono leggere. Conserva un backup e la password in luoghi sicuri.')))),
+    scheda({ titolo: 'Zona pericolosa', sottotitolo: 'Azioni irreversibili', classe: 'scheda-pericolo' },
+      h('div', { classe: 'riga-pericolo' },
+        h('div', null, h('strong', null, 'Elimina tutto l’archivio e riparti da zero'),
+          h('p', { classe: 'muted' }, 'Cancella dal browser clienti, fatture, spese, impostazioni e password. Dopo l’eliminazione l’app torna alla schermata di primo avvio. Scarica prima un backup se vuoi poter tornare indietro.')),
+        h('div', { classe: 'gruppo-azioni' },
+          bottone('Scarica backup', { icona: 'scarica', onClick: async () => { const b = await archivio.esporta(); scarica(`gestione-forfettario-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(b)); ctx.toast('Backup scaricato.'); } }),
+          bottone('Elimina archivio…', { variante: 'pericolo', icona: 'cestino', onClick: () => ctx.eliminaArchivio() })))));
 }

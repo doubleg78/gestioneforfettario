@@ -145,3 +145,8 @@ Ancora aperto:
 - Testo dell'art. 6 DL 89/2026 non letto direttamente (riguarda solo scadenze 2026 già passate).
 - Scadenze del regime ordinario segnalate come "parziali".
 - Le date di differimento del bollo sono applicate in automatico: verificare caso per caso.
+
+## Fase 5: eliminazione archivio e interfaccia "enterprise"
+
+- **Eliminazione totale dell'archivio** (`Archivio.elimina()`): svuota il database IndexedDB senza chiedere la password, quindi funziona anche se è stata dimenticata. Si raggiunge da *Backup e sicurezza → Zona pericolosa*, dal menu dello studio (in basso a sinistra), dalla palette comandi e dal link "Elimina l'archivio e riparti da zero" nella schermata di blocco. Chiede di digitare ELIMINA; dopo la conferma l'app torna al primo avvio. Provato nel browser: record rimasti nel database = 0, annullamento senza effetti.
+- **Interfaccia rivista sul modello delle app SaaS di grandi aziende** (Stripe, Linear, Vercel, Atlassian): barra laterale chiara con selettore dello studio, ricerca rapida e account in basso; percorso (breadcrumb) con cambio cliente; schede per le sezioni del cliente; campanella con le scadenze entro 14 giorni; menu account; indicatore "Salvato"; colore di marca indaco con neutri sobri; densità maggiore di tabelle, bottoni e schede; schermata di accesso con anteprima del prodotto; tema scuro dedicato. Palette dei grafici (indaco/arancio) ricontrollata con lo script dataviz per tema chiaro e scuro.
