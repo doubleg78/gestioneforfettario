@@ -7,6 +7,7 @@ import { calcolaForfettario, aliquotaSostitutiva, bolloDovuto } from '../js/fisc
 import { calcolaOrdinario } from '../js/fiscal/ordinario.js';
 import { confrontaRegimi, scenari } from '../js/fiscal/confronto.js';
 import { verificaSoglieRicavi, verificaCauseEsclusione, verificaRequisitiStartup } from '../js/fiscal/requisiti.js';
+import { gruppoAteco, coefficienteAteco } from '../js/fiscal/ateco.js';
 import { accontiSostitutiva, saldoSostitutiva } from '../js/fiscal/acconti.js';
 
 const p = parametriAnno(2026);
@@ -35,10 +36,13 @@ test('IVS 2026: contributi fissi come da circolare INPS 14/2026', () => {
 test('IVS: eccedenza oltre il minimale, maggiorazione sopra 56.224 €', () => {
   const a = contributiIvs(30000, p, 'artigiani');
   assert.equal(a.eccedenza, 2686.08); // (30000-18808)*24%
-  const alto = contributiIvs(70000, p, 'artigiani');
+  const alto = contributiIvs(70000, p, 'artigiani', { iscrittoDal1996: false });
   const atteso = (56224 - 18808) * 0.24 + (70000 - 56224) * 0.25;
   assert.equal(alto.eccedenza, Math.round(atteso * 100) / 100);
-  assert.equal(contributiIvs(200000, p, 'artigiani').totale, contributiIvs(93707, p, 'artigiani').totale);
+  assert.equal(contributiIvs(200000, p, 'artigiani', { iscrittoDal1996: false }).totale,
+    contributiIvs(93707, p, 'artigiani', { iscrittoDal1996: false }).totale);
+  assert.equal(contributiIvs(200000, p, 'artigiani').totale, contributiIvs(122295, p, 'artigiani').totale);
+  assert.ok(contributiIvs(110000, p, 'artigiani').totale > contributiIvs(110000, p, 'artigiani', { iscrittoDal1996: false }).totale);
 });
 
 test('IVS: riduzione 35% forfettari', () => {
@@ -180,4 +184,26 @@ test('requisiti startup 5%', () => {
 
 test('codici tributo F24 forfettari', () => {
   assert.deepEqual(p.forfettario.codiciTributo, { accontoPrimaRata: '1790', accontoSecondaRataOUnica: '1791', saldo: '1792' });
+});
+
+test('coefficienti: Allegato 4 L. 190/2014', () => {
+  const c = p.forfettario.coefficienti;
+  assert.equal(c['attivita-professionali-sanitarie'], 0.78);
+  assert.equal(c['commercio-ambulante-altri'], 0.54);
+  assert.equal(c['costruzioni-immobiliari'], 0.86);
+  assert.equal(c['intermediari-commercio'], 0.62);
+  assert.equal(c['altre-attivita'], 0.67);
+  assert.equal(c['alloggio-ristorazione'], 0.4);
+});
+
+test('ATECO 2007 -> coefficiente', () => {
+  assert.equal(coefficienteAteco('62.01.00', p).coefficiente, 0.67);
+  assert.equal(coefficienteAteco('69.20.11', p).coefficiente, 0.78);
+  assert.equal(coefficienteAteco('47.82.01', p).coefficiente, 0.54);
+  assert.equal(coefficienteAteco('47.81.01', p).coefficiente, 0.4);
+  assert.equal(coefficienteAteco('46.11.01', p).coefficiente, 0.62);
+  assert.equal(coefficienteAteco('46.21', p).coefficiente, 0.4);
+  assert.equal(coefficienteAteco('43.21.01', p).coefficiente, 0.86);
+  assert.equal(coefficienteAteco('56.10.11', p).coefficiente, 0.4);
+  assert.equal(gruppoAteco('00.00'), null);
 });

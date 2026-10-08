@@ -75,7 +75,14 @@ tests/          test del motore di calcolo (pagina HTML o Node)
 | Gestione Separata 2026 | Verificato: 26,07%, 24%, minimale 18.808 €, massimale 122.295 € | INPS, circolare 8/2026 |
 | Codici tributo F24 | Verificato: 1790 acconto I rata, 1791 acconto II rata o unica, 1792 saldo | AdE, Risoluzione 59/E/2015 |
 | Acconti | **Corretto**: 40% + 60%, non 50/50. Il 50/50 dell'art. 58 DL 124/2019 vale per i soggetti ISA (art. 12-quinquies DL 34/2019). Il c. 64 rinvia alle regole IRPEF. Alcune guide parlano di 50/50 anche per i forfettari: da riconfermare su prassi AdE prima dell'uso | Normattiva |
-| IVS 2026 | Aliquote, minimale e massimali coerenti tra INPS e fonti secondarie; testo integrale della circolare 14/2026 non letto per intero | INPS circ. 14/2026 |
-| Soglia 35.000 € lavoro dipendente | Solo fonti secondarie (L. 199/2025 c. 27); Normattiva riporta ancora 30.000 € nel testo base | da confermare |
-| Coefficienti di redditività | Allegato 4 non presente nel testo estratto; valori noti, da confrontare con la tabella ufficiale | da confermare |
-| Scadenze 2026 e proroghe (es. 20 luglio) | Riferite da fonti secondarie, non verificate | da confermare |
+| IVS 2026 | Verificato sul testo della circolare. Fissi 4.521,36 € (artigiani) e 4.611,64 € (commercianti); minimale 18.808 €; maggiorazione +1 punto oltre 56.224 €. **Corretto il massimale**: 93.707 € solo per iscritti con anzianità al 31/12/1995, 122.295 € per gli iscritti dal 1/1/1996 (campo `iscrittoDal1996`, predefinito sì). Riduzione 35%: nel 2026 resta ai beneficiari 2025 che non rinunciano; i nuovi iscritti devono fare domanda entro il 28 febbraio | INPS circ. 14/2026 |
+| Soglia 35.000 € lavoro dipendente | Il c. 27 L. 199/2025 sostituisce "l'anno 2025" con "gli anni 2025 e 2026" nel c. 12 art. 1 L. 207/2024; torna a 30.000 € dal 2027. Fonti secondarie concordi e rimando nella circolare INPS 14/2026; testo di legge non letto direttamente (Normattiva non più raggiungibile in sessione) | fonti secondarie |
+| Coefficienti di redditività | Verificati sul testo dell'Allegato 4 L. 190/2014 pubblicato da AdE: 40, 40, 40, 54, 86, 62, 40, 78, 67. Sono per ATECO 2007: manca ancora la conversione da ATECO 2025. Aggiunto `ateco.js` | AdE (Allegato 4) |
+| Scadenze 2026 | Saldo 2025 e primo acconto 2026 per ISA e forfettari prorogati al 20 luglio (DL 22 maggio 2026 n. 89, art. 6), con +0,80% fino al 19/20 agosto: già scaduti. Resta il secondo acconto al 30 novembre 2026. Dichiarazione al 31 ottobre. Conversione in legge del DL non verificata | fonti secondarie |
+| Acconti 40/60 | Il testo di legge porta al 40/60 (art. 17 DPR 435/2001 via c. 64). Alcune guide dicono 50/50: la percentuale è un parametro (`percentualeRata1`) modificabile | da riconfermare su prassi AdE |
+
+## Voci ancora aperte
+
+- Conversione ATECO 2025 -> 2007 per i codici nuovi.
+- Prassi AdE sulla ripartizione degli acconti dei forfettari.
+- Conversione in legge del DL 89/2026 e dettagli della proroga.

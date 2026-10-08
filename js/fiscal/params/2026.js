@@ -24,8 +24,17 @@ export default {
     acconto: { sogliaMinima: 51.65, sogliaRataUnica: 257.52, percentualeRata1: 0.4 },
     // Codici tributo F24 (Risoluzione AdE 59/E del 11/6/2015)
     codiciTributo: { accontoPrimaRata: '1790', accontoSecondaRataOUnica: '1791', saldo: '1792' },
-    daVerificare: ['soglia 35.000 € lavoro dipendente (solo fonti secondarie)', 'scadenze e proroghe 2026'],
+    // Soglia 35.000: L. 199/2025 c. 27 estende al 2026 il c. 12 art. 1 L. 207/2024 (fonti secondarie concordi).
+    // Coefficienti: Allegato 4 L. 190/2014 nel testo pubblicato da AdE; codici ATECO 2007 (v. `atecoDivisioni`).
+    // Scadenze: v. `scadenze` (DL 89/2026 art. 6 per la proroga 2026).
+    daVerificare: ['acconto 40/60 vs prassi AdE', 'conversione ATECO 2025'],
     // Coefficienti di redditività per gruppo di settore (Allegato 4 L. 190/2014)
+    scadenze: {
+      saldoEPrimoAcconto: '06-30',        // ordinaria; nel 2026 prorogata al 20/7 (DL 89/2026 art. 6),
+      saldoEPrimoAccontoProroga2026: '07-20', // con +0,80% fino al 20/8 (fonti secondarie)
+      secondoAcconto: '11-30',
+      dichiarazione: '10-31',
+    },
     coefficienti: {
       'industrie-alimentari-bevande': 0.40,
       'commercio-ingrosso-dettaglio': 0.40,
@@ -54,7 +63,9 @@ export default {
     minimale: 18808,
     aliquote: { artigiani: 0.24, commercianti: 0.2448 },
     maggiorazione: { sogliaReddito: 56224, punti: 0.01 }, // +1 punto oltre 56.224 €
-    massimale: 93707,           // 56.224 + 37.483, per iscritti dopo il 1/1/1996
+    // Circ. INPS 14/2026 p. 4: 93.707 (56.224 + 37.483) per iscritti con anzianità al 31/12/1995;
+    // 122.295 per chi è iscritto dal 1/1/1996 (non frazionabile).
+    massimale: { ante1996: 93707, dal1996: 122295 },
     contributoMaternitaAnnuo: 7.44, // 0,62 €/mese
   },
 

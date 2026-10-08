@@ -14,9 +14,10 @@ export function contributiGestioneSeparata(reddito, params, { altraCopertura = f
 /**
  * Contributi IVS artigiani/commercianti: fissi sul minimale + eccedenza.
  * @param {'artigiani'|'commercianti'} gestione
- * @param {{riduzione35?: boolean}} opzioni riduzione 35% prevista per i forfettari
+ * @param {{riduzione35?: boolean, iscrittoDal1996?: boolean}} opzioni riduzione 35% (forfettari, su domanda)
+ *   e anzianità: gli iscritti dal 1/1/1996 hanno massimale 122.295 €, gli altri 93.707 €
  */
-export function contributiIvs(reddito, params, gestione, { riduzione35 = false } = {}) {
+export function contributiIvs(reddito, params, gestione, { riduzione35 = false, iscrittoDal1996 = true } = {}) {
   const { ivs, forfettario } = params;
   const aliquota = ivs.aliquote[gestione];
   if (aliquota === undefined) throw new Error(`Gestione IVS sconosciuta: ${gestione}`);
@@ -24,12 +25,13 @@ export function contributiIvs(reddito, params, gestione, { riduzione35 = false }
   const redditoBase = clamp0(reddito);
   const fisso = round2(ivs.minimale * aliquota + ivs.contributoMaternitaAnnuo);
 
-  const baseOltreMinimale = Math.min(redditoBase, ivs.massimale) - ivs.minimale;
+  const massimale = iscrittoDal1996 ? ivs.massimale.dal1996 : ivs.massimale.ante1996;
+  const baseConsiderata = Math.min(redditoBase, massimale);
   let eccedenza = 0;
-  if (baseOltreMinimale > 0) {
+  if (baseConsiderata - ivs.minimale > 0) {
     const soglia = ivs.maggiorazione.sogliaReddito;
-    const fasciaBassa = Math.min(Math.min(redditoBase, ivs.massimale), soglia) - ivs.minimale;
-    const fasciaAlta = Math.min(redditoBase, ivs.massimale) - soglia;
+    const fasciaBassa = Math.min(baseConsiderata, soglia) - ivs.minimale;
+    const fasciaAlta = baseConsiderata - soglia;
     eccedenza = clamp0(fasciaBassa) * aliquota + clamp0(fasciaAlta) * (aliquota + ivs.maggiorazione.punti);
   }
 
@@ -51,7 +53,7 @@ export function contributiPrevidenziali(reddito, params, previdenza, opzioni = {
       return contributiGestioneSeparata(reddito, params, previdenza);
     case 'artigiani':
     case 'commercianti':
-      return contributiIvs(reddito, params, previdenza.tipo, opzioni);
+      return contributiIvs(reddito, params, previdenza.tipo, { iscrittoDal1996: previdenza.iscrittoDal1996 ?? true, ...opzioni });
     case 'cassa':
       return contributiCassa(reddito, previdenza.cassa ?? params.cassa.predefinita);
     default:
