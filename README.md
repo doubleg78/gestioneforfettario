@@ -4,11 +4,15 @@ Webapp per studi che gestiscono contribuenti in regime forfettario. Solo HTML, C
 
 ## Avvio
 
-I moduli ES richiedono un server HTTP locale (non funzionano da `file://`):
+Apri `index.html` con un doppio clic: nessun server, nessuna installazione. L'app carica `dist/app.js` (già incluso nel repository).
+
+## Sviluppo
+
+I sorgenti sono moduli ES in `js/`. Dopo ogni modifica rigenera il file unico che il browser carica:
 
 ```
-npm start        # python3 -m http.server 8080
-# apri http://localhost:8080
+npm install      # una volta sola (installa solo esbuild, strumento di sviluppo)
+npm run build    # js/ -> dist/app.js
 ```
 
 ## Test

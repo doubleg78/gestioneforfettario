@@ -86,7 +86,7 @@ Motore di calcolo in `js/fiscal/`, parametri 2026 verificati (v. sotto). Le cass
 ## Fase 2: cosa c'è e cosa no
 
 Fatto: archivio cifrato (`js/storage/`), import CSV/XML (`js/import/`), riepilogo con criterio di cassa (`js/domain/`), viste (`js/ui/`).
-Provato nel browser con Chromium: creazione archivio, cliente con ATECO 2025, fattura, import CSV, riepilogo, backup, blocco/sblocco con password errata, persistenza dopo reload, layout mobile.
+Si apre con un doppio clic su `index.html` (bundle `dist/app.js` generato da `npm run build`, senza server). Provato nel browser con Chromium da `file://`: creazione archivio, cliente con ATECO 2025, fattura, import CSV, riepilogo, backup, blocco/sblocco con password errata, persistenza dopo reload, layout mobile.
 
 Limiti noti:
 - Un solo anno di parametri (2026): il riepilogo usa sempre i parametri 2026, anche per anni diversi.
