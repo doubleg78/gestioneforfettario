@@ -3,8 +3,9 @@ import { nuovoCliente } from '../domain/modello.js';
 import { riepilogoAnno } from '../domain/riepilogo.js';
 
 export function vistaClienti(ctx) {
-  const { archivio, dati, params } = ctx;
+  const { archivio, dati } = ctx;
   const anno = new Date().getFullYear();
+  const params = ctx.paramsAnno(anno).params;
 
   const righe = dati.clienti.map((c) => {
     const r = riepilogoAnno(c, dati, anno, params);

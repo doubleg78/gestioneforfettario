@@ -1,10 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { parametriAnno } from '../js/fiscal/params/index.js';
+import { parametriAnno, parametriPerAnno, anniDisponibili } from '../js/fiscal/params/index.js';
 import { applicaScaglioni } from '../js/fiscal/utils.js';
 import { contributiGestioneSeparata, contributiIvs, contributiCassa } from '../js/fiscal/inps.js';
 import { calcolaForfettario, aliquotaSostitutiva, bolloDovuto } from '../js/fiscal/forfettario.js';
-import { calcolaOrdinario } from '../js/fiscal/ordinario.js';
+import { calcolaOrdinario, detrazioneLavoroAutonomo } from '../js/fiscal/ordinario.js';
 import { confrontaRegimi, scenari } from '../js/fiscal/confronto.js';
 import { verificaSoglieRicavi, verificaCauseEsclusione, verificaRequisitiStartup } from '../js/fiscal/requisiti.js';
 import { gruppoAteco, coefficienteAteco, coefficienteAteco2025 } from '../js/fiscal/ateco.js';
@@ -219,4 +219,51 @@ test('ATECO 2025 -> coefficiente tramite raccordo ISTAT', () => {
   assert.equal(amb.univoco, false);
   assert.ok(amb.candidati.length > 1);
   assert.equal(coefficienteAteco2025('99.99.99', p), null);
+});
+
+test('detrazione lavoro autonomo (art. 13 c. 5 e 5-ter TUIR)', () => {
+  assert.equal(detrazioneLavoroAutonomo(4000, p), 1265);
+  assert.equal(detrazioneLavoroAutonomo(5500, p), 1265);
+  assert.equal(detrazioneLavoroAutonomo(15000, p), 992);   // 500 + 765*13.000/22.500 + 50 (fascia 11.000-17.000)
+  assert.equal(detrazioneLavoroAutonomo(28000, p), 500);
+  assert.equal(detrazioneLavoroAutonomo(39000, p), 250);   // 500 * 11.000 / 22.000
+  assert.equal(detrazioneLavoroAutonomo(50000, p), 0);
+  assert.equal(detrazioneLavoroAutonomo(80000, p), 0);
+  assert.equal(detrazioneLavoroAutonomo(11000, p), 1078);   // 500 + 765*17.000/22.500, senza i 50 € (solo oltre 11.000)
+  assert.equal(detrazioneLavoroAutonomo(17000, p), 924);    // 500 + 765*11.000/22.500 + 50
+});
+
+test('ordinario: detrazione automatica, altre detrazioni e perdite pregresse', () => {
+  const dati = { ricavi: 40000, costi: 0, previdenza: { tipo: 'cassa', cassa: { aliquotaSoggettiva: 0.1 } } };
+  const base = calcolaOrdinario(p, dati);
+  assert.equal(base.imponibile, 36000);
+  assert.equal(base.detrazioneAutonomi, detrazioneLavoroAutonomo(36000, p));
+  assert.equal(base.irpef, Math.round((base.irpefLorda - base.detrazioneAutonomi) * 100) / 100);
+  const senza = calcolaOrdinario(p, { ...dati, senzaDetrazioneAutonomi: true });
+  assert.equal(senza.irpef, senza.irpefLorda);
+  const perdite = calcolaOrdinario(p, { ...dati, perditePregresse: 6000 });
+  assert.equal(perdite.imponibile, 30000);
+  assert.ok(calcolaOrdinario(p, { ...dati, detrazioni: 100000 }).irpef === 0);
+});
+
+test('parametri 2025 verificati su circolari INPS 27 e 38 del 2025', () => {
+  const p25 = parametriAnno(2025);
+  assert.equal(p25.gestioneSeparata.minimale, 18555);
+  assert.equal(p25.gestioneSeparata.massimale, 120607);
+  assert.equal(p25.ivs.maggiorazione.sogliaReddito, 55448);
+  assert.deepEqual(p25.ivs.massimale, { ante1996: 92413, dal1996: 120607 });
+  assert.equal(contributiIvs(0, p25, 'artigiani').totale, 4460.64);
+  assert.equal(contributiIvs(0, p25, 'commercianti').totale, 4549.7);
+  // massimale con anzianità ante 1996: 22.548,77 € (artigiani), come da circolare
+  assert.equal(contributiIvs(500000, p25, 'artigiani', { iscrittoDal1996: false }).totale, 22548.77 + 7.44);
+  assert.equal(p25.irpef.scaglioni[1].aliquota, 0.35);
+});
+
+test('parametri per anno con ripiego sull\'anno più vicino', () => {
+  assert.deepEqual(anniDisponibili(), [2025, 2026]);
+  assert.equal(parametriPerAnno(2026).esatto, true);
+  const a = parametriPerAnno(2024);
+  assert.equal(a.esatto, false);
+  assert.equal(a.annoUsato, 2025);
+  assert.equal(parametriPerAnno(2030).annoUsato, 2026);
 });

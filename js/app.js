@@ -1,7 +1,7 @@
 import { h } from './ui/dom.js';
 import { Archivio } from './storage/vault.js';
 import { adattatoreIndexedDB } from './storage/adapters.js';
-import { parametriAnno } from './fiscal/params/index.js';
+import { parametriAnno, parametriPerAnno } from './fiscal/params/index.js';
 import { schermataSblocco } from './ui/sblocco.js';
 import { vistaClienti } from './ui/clienti.js';
 import { vistaAnagrafica } from './ui/anagrafica.js';
@@ -35,7 +35,7 @@ function contesto() {
   const dati = archivio.dati;
   const cliente = dati.clienti.find((c) => c.id === dati.ui.clienteId) ?? dati.clienti[0] ?? null;
   return {
-    archivio, dati, cliente, params: params(), stato,
+    archivio, dati, cliente, params: params(), paramsAnno: parametriPerAnno, stato,
     aggiorna: disegna,
     selezionaCliente: async (id, dest) => { await archivio.modifica((d) => { d.ui.clienteId = id; }); if (dest) location.hash = dest; },
   };

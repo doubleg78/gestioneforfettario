@@ -62,7 +62,11 @@ test('scadenzario artigiani: 4 rate dei contributi fissi', () => {
   const fissi = v.filter((x) => x.id.startsWith('inps-fisso'));
   assert.equal(fissi.length, 4);
   assert.equal(fissi[0].importo, 1130.34);      // 4521,36 / 4
-  assert.equal(fissi[3].data, '2027-02-16');
+  assert.deepEqual(fissi.map((x) => x.data), ['2026-05-18', '2026-08-20', '2026-11-16', '2027-02-16']);
+  assert.equal(fissi[0].causaleInps, 'AF');
+  const comm = calcolaScadenzario(p, { ...base, previdenza: { tipo: 'commercianti' }, contributiAnnoPrec: { totale: 6000 } });
+  assert.equal(comm.find((x) => x.id === 'inps-fisso-1').causaleInps, 'CF');
+  assert.equal(comm.find((x) => x.id === 'inps-saldo').causaleInps, 'CP');
 });
 
 test('scadenzario cassa professionale: non calcolato', () => {
@@ -91,4 +95,31 @@ test('CSV: formato italiano, virgolette e neutralizzazione formule', () => {
   assert.match(csv, /'=CMD\(\);"ok ""q"""/);
   assert.match(csvFatture([{ numero: '1', data: '2026-01-05', controparte: 'A', importo: 10, dataIncasso: '', bollo: 2, atecoCodice: '' }]), /1;05\/01\/2026;A;10,00;;2,00;/);
   assert.match(csvScadenzario([{ data: '2026-06-30', descrizione: 'S', importo: 1, codiceTributo: '1792', annoRiferimento: 2025, nota: '' }]), /30\/06\/2026;S;1,00;1792;2025/);
+});
+
+test('Gestione Separata: acconto = aliquota sull\'80% del reddito, due rate uguali, causale PXX/P10', () => {
+  const v = calcolaScadenzario(p, { ...base, redditoAnnoPrec: 40000, contributiAnnoPrec: { totale: 10428 } });
+  const a1 = v.find((x) => x.id === 'inps-acc1'), a2 = v.find((x) => x.id === 'inps-acc2');
+  assert.equal(a1.importo + a2.importo, 8342.4);          // 40000 * 80% * 26,07%
+  assert.equal(a1.importo, a2.importo);
+  assert.equal(a1.causaleInps, 'PXX');
+  const p10 = calcolaScadenzario(p, { ...base, redditoAnnoPrec: 40000, contributiAnnoPrec: { totale: 9600 }, previdenza: { tipo: 'gestione-separata', altraCopertura: true } });
+  assert.equal(p10.find((x) => x.id === 'inps-acc1').causaleInps, 'P10');
+  assert.equal(p10.find((x) => x.id === 'inps-acc1').importo * 2, 7680);   // 40000 * 80% * 24%
+  const capped = calcolaScadenzario(p, { ...base, redditoAnnoPrec: 500000, contributiAnnoPrec: { totale: 31881 } });
+  assert.equal(Math.round((capped.find((x) => x.id === 'inps-acc1').importo + capped.find((x) => x.id === 'inps-acc2').importo) * 100) / 100, 25505.85); // massimale 122.295 * 80% * 26,07%
+});
+
+test('ripartizione acconti 40/60 su richiesta', () => {
+  const v = calcolaScadenzario(p, { ...base, percentualeRata1: 0.4 });
+  assert.equal(v.find((x) => x.id === 'sost-acc1').importo, 1600);
+  assert.equal(v.find((x) => x.id === 'sost-acc2').importo, 2400);
+});
+
+test('cassa professionale: versamenti manuali', () => {
+  const v = calcolaScadenzario(p, { ...base, previdenza: { tipo: 'cassa' }, scadenzeManuali: [{ data: '2026-10-31', descrizione: 'Rata cassa', importo: 1200 }] });
+  assert.equal(v.some((x) => x.id === 'inps-cassa'), false);
+  const m = v.find((x) => x.id === 'cassa-0');
+  assert.equal(m.importo, 1200);
+  assert.equal(m.data, '2026-11-02');
 });

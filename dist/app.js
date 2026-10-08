@@ -137,6 +137,19 @@
       this.sessione = sessione;
       this.dati = dati;
     }
+    /** Cambia la password: verifica quella attuale, poi risigilla l'archivio con salt e chiave nuovi. */
+    async cambiaPassword(attuale, nuova) {
+      if (!this.sbloccato) throw new Error("Archivio bloccato");
+      if (nuova.length < 10) throw new Error("La nuova password deve avere almeno 10 caratteri");
+      const blob = await this.adattatore.leggi(CHIAVE);
+      try {
+        await apri(blob, attuale);
+      } catch {
+        throw new ErrorePassword();
+      }
+      this.sessione = await nuovaSessione(nuova, this.iterazioni);
+      await this.salva();
+    }
     blocca() {
       this.sessione = null;
       this.dati = null;
@@ -209,8 +222,125 @@
     };
   }
 
-  // js/fiscal/params/2026.js
+  // js/fiscal/params/2025.js
   var __default = {
+    anno: 2025,
+    forfettario: {
+      // L. 190/2014 art. 1 c. 54-89, come modificata dalla L. 199/2025 (bilancio 2026)
+      soglie: {
+        ricaviEsclusione: 85e3,
+        // superata: uscita dall'anno successivo
+        ricaviUscitaImmediata: 1e5,
+        // superata: uscita nell'anno stesso
+        redditoLavoroDipendente: 35e3,
+        // 35.000 per il 2025 (L. 207/2024 c. 12); ordinariamente 30.000
+        alertPercentuale: 0.9
+        // soglia di preallarme (scelta dell'app, non di legge)
+      },
+      aliquote: { ordinaria: 0.15, startup: 0.05, anniStartup: 5 },
+      bollo: { sogliaImporto: 77.47, importo: 2 },
+      // VERIFICATO su Normattiva: L. 190/2014 art. 1 c. 77 (contribuzione ridotta del 35%,
+      // solo gestioni artigiani/commercianti L. 233/1990; richiesta all'INPS)
+      riduzioneContributiIvs: 0.35,
+      // Acconto: 100% dell'imposta dell'anno precedente (metodo storico), 2 rate.
+      // Ripartizione 50% + 50% (confermata dall'utente per i forfettari; art. 58 DL 124/2019 per i soggetti ISA).
+      // Il testo letterale (c. 64 + art. 17 DPR 435/2001) porterebbe a 40% + 60%: v. BRIEFING.md.
+      acconto: { sogliaMinima: 51.65, sogliaRataUnica: 257.52, percentualeRata1: 0.5 },
+      // Codici tributo F24 (Risoluzione AdE 59/E del 11/6/2015)
+      codiciTributo: { accontoPrimaRata: "1790", accontoSecondaRataOUnica: "1791", saldo: "1792" },
+      // Soglia 35.000: art. 1 c. 12 L. 207/2024 per il 2025 (fonti secondarie concordi).
+      // Coefficienti: Allegato 4 L. 190/2014 nel testo pubblicato da AdE; codici ATECO 2007 (v. `atecoDivisioni`).
+      // Scadenze: ordinarie. Nel 2025 il versamento di saldo e primo acconto per ISA/forfettari è stato prorogato
+      // al 21 luglio (non modellato).
+      daVerificare: [],
+      // Coefficienti di redditività per gruppo di settore (Allegato 4 L. 190/2014)
+      scadenze: {
+        saldoEPrimoAcconto: "06-30",
+        // ordinaria; nel 2026 prorogata al 20/7 (art. 6 DL 89/2026,
+        saldoEPrimoAccontoProroga2026: "07-20",
+        // poi abrogato dalla L. 113/2026 con effetti fatti salvi),
+        // con +0,80% fino al 20/8
+        secondoAcconto: "11-30",
+        dichiarazione: "10-31"
+      },
+      coefficienti: {
+        "industrie-alimentari-bevande": 0.4,
+        "commercio-ingrosso-dettaglio": 0.4,
+        "commercio-ambulante-alimentare": 0.4,
+        "commercio-ambulante-altri": 0.54,
+        "intermediari-commercio": 0.62,
+        "alloggio-ristorazione": 0.4,
+        "attivita-professionali-sanitarie": 0.78,
+        "altre-attivita": 0.67,
+        "costruzioni-immobiliari": 0.86
+      }
+    },
+    // VERIFICATO su INPS: circolare n. 27 del 30/1/2025 (26,07% = 25% IVS + 0,72% + 0,35% ISCRO;
+    // 24% con altra copertura; minimale 18.555 €; massimale 120.607 €).
+    gestioneSeparata: {
+      aliquotaProfessionistaSenzaCopertura: 0.2607,
+      // 25% IVS + 0,72% + 0,35% ISCRO
+      aliquotaConAltraCopertura: 0.24,
+      minimale: 18555,
+      massimale: 120607,
+      // VERIFICATO (AdE, Redditi PF 2026 fasc. 2, Quadro RR): due acconti di pari importo, alle scadenze
+      // degli acconti IRPEF; totale = aliquote dell'anno corrente sull'80% del reddito di lavoro autonomo
+      // dell'anno precedente, nel limite del massimale dell'anno corrente.
+      acconto: { percentuale: 0.8, rate: 2 },
+      // Causali F24 INPS (circ. INPS 105/2025, istruzioni Redditi): PXX con aliquota 26,07%, P10 con aliquota 24%
+      causaliF24: { standard: "PXX", altraCopertura: "P10" }
+    },
+    // VERIFICATO su INPS: circolare n. 38 del 7/2/2025 (minimale 18.555 €, aliquote 24% e 24,48%,
+    // +1 punto oltre 55.448 €, massimali 92.413 € e 120.607 €, fissi 4.460,64 € e 4.549,70 €).
+    ivs: {
+      minimale: 18555,
+      aliquote: { artigiani: 0.24, commercianti: 0.2448 },
+      maggiorazione: { sogliaReddito: 55448, punti: 0.01 },
+      // +1 punto oltre 55.448 €
+      // Circ. INPS 38/2025 p. 4: 92.413 (55.448 + 36.965) per iscritti con anzianità al 31/12/1995;
+      // 120.607 per chi è iscritto dal 1/1/1996.
+      massimale: { ante1996: 92413, dal1996: 120607 },
+      contributoMaternitaAnnuo: 7.44,
+      // 0,62 €/mese
+      // Acconti sulla quota eccedente il minimale: 80% in due rate uguali (stesse scadenze IRPEF).
+      // L'INPS (circ. 38/2025, p. 9) prevede saldo, primo e secondo acconto; la misura dell'80% non è
+      // riportata nelle circolari lette: da confermare nel Cassetto previdenziale ("Dati del mod. F24").
+      acconto: { percentuale: 0.8, rate: 2, daVerificare: true },
+      // Rate dei contributi sul minimale (circ. INPS 38/2025 p. 9: 16/5, 20/8, 17/11 [16/11 è domenica], 16/2/2026)
+      scadenzeFissi: ["05-16", "08-20", "11-16", "02-16"],
+      // circ. INPS 38/2025: 16/5, 20/8, 17/11 (16/11 domenica), 16/2/2026
+      // Causali F24: AF/CF minimale, AP/CP quota eccedente (pagina INPS "F24 per artigiani e commercianti")
+      causaliF24: { artigiani: { minimale: "AF", eccedenza: "AP" }, commercianti: { minimale: "CF", eccedenza: "CP" } }
+    },
+    // Casse professionali: i parametri variano per cassa, vengono inseriti dall'utente.
+    cassa: { predefinita: { aliquotaSoggettiva: 0.1, contributoMinimo: 0 } },
+    // 2025: secondo scaglione al 35% (la riduzione al 33% è della L. 199/2025, dal 2026).
+    irpef: {
+      scaglioni: [
+        { fino: 28e3, aliquota: 0.23 },
+        { fino: 5e4, aliquota: 0.35 },
+        { fino: Infinity, aliquota: 0.43 }
+      ],
+      // Detrazione per redditi di lavoro autonomo, art. 13 c. 5 e 5-ter TUIR (non cumulabile con quelle dei c. 1-4).
+      // Fonte: testo del TUIR riportato da Brocardi/Lexplain (non da Normattiva).
+      detrazioneLavoroAutonomo: {
+        importoFisso: 1265,
+        finoA: 5500,
+        base: 500,
+        extra: 765,
+        finoA2: 28e3,
+        divisore: 22500,
+        finoA3: 5e4,
+        divisore3: 22e3,
+        aumento: { da: 11e3, a: 17e3, importo: 50 }
+      }
+    },
+    irap: { aliquota: 0.039 }
+    // aliquota ordinaria; le regioni possono variarla
+  };
+
+  // js/fiscal/params/2026.js
+  var __default2 = {
     anno: 2026,
     forfettario: {
       // L. 190/2014 art. 1 c. 54-89, come modificata dalla L. 199/2025 (bilancio 2026)
@@ -269,8 +399,12 @@
       aliquotaConAltraCopertura: 0.24,
       minimale: 18808,
       massimale: 122295,
-      // Acconto: 80% dei contributi dell'anno precedente in due rate uguali (40% + 40%). Regola da verificare.
-      acconto: { percentuale: 0.8, rate: 2, daVerificare: true }
+      // VERIFICATO (AdE, Redditi PF 2026 fasc. 2, Quadro RR): due acconti di pari importo, alle scadenze
+      // degli acconti IRPEF; totale = aliquote dell'anno corrente sull'80% del reddito di lavoro autonomo
+      // dell'anno precedente, nel limite del massimale dell'anno corrente.
+      acconto: { percentuale: 0.8, rate: 2 },
+      // Causali F24 INPS (circ. INPS 105/2025, istruzioni Redditi): PXX con aliquota 26,07%, P10 con aliquota 24%
+      causaliF24: { standard: "PXX", altraCopertura: "P10" }
     },
     // VERIFICATO su INPS: circolare n. 14 del 9/2/2026 (aliquote, minimale, maggiorazione e massimale
     // da risultati di ricerca che citano la circolare; testo integrale non letto per intero).
@@ -284,9 +418,14 @@
       massimale: { ante1996: 93707, dal1996: 122295 },
       contributoMaternitaAnnuo: 7.44,
       // 0,62 €/mese
+      // Acconti sulla quota eccedente il minimale: 80% in due rate uguali (stesse scadenze IRPEF).
+      // L'INPS (circ. 14/2026, p. 9) prevede saldo, primo e secondo acconto; la misura dell'80% non è
+      // riportata nelle circolari lette: da confermare nel Cassetto previdenziale ("Dati del mod. F24").
       acconto: { percentuale: 0.8, rate: 2, daVerificare: true },
-      // Rate dei contributi fissi (circ. INPS 14/2026): 18/5, 20/8, 17/11 dell'anno e 16/2 dell'anno successivo
-      scadenzeFissi: ["05-18", "08-20", "11-17", "02-16"]
+      // Rate dei contributi sul minimale (circ. INPS 14/2026 p. 9: 18/5 [16/5 è sabato], 20/8, 16/11, 16/2/2027)
+      scadenzeFissi: ["05-16", "08-20", "11-16", "02-16"],
+      // Causali F24: AF/CF minimale, AP/CP quota eccedente (pagina INPS "F24 per artigiani e commercianti")
+      causaliF24: { artigiani: { minimale: "AF", eccedenza: "AP" }, commercianti: { minimale: "CF", eccedenza: "CP" } }
     },
     // Casse professionali: i parametri variano per cassa, vengono inseriti dall'utente.
     cassa: { predefinita: { aliquotaSoggettiva: 0.1, contributoMinimo: 0 } },
@@ -296,18 +435,40 @@
         { fino: 28e3, aliquota: 0.23 },
         { fino: 5e4, aliquota: 0.33 },
         { fino: Infinity, aliquota: 0.43 }
-      ]
+      ],
+      // Detrazione per redditi di lavoro autonomo, art. 13 c. 5 e 5-ter TUIR (non cumulabile con quelle dei c. 1-4).
+      // Fonte: testo del TUIR riportato da Brocardi/Lexplain (non da Normattiva).
+      detrazioneLavoroAutonomo: {
+        importoFisso: 1265,
+        finoA: 5500,
+        base: 500,
+        extra: 765,
+        finoA2: 28e3,
+        divisore: 22500,
+        finoA3: 5e4,
+        divisore3: 22e3,
+        aumento: { da: 11e3, a: 17e3, importo: 50 }
+      }
     },
     irap: { aliquota: 0.039 }
     // aliquota ordinaria; le regioni possono variarla
   };
 
   // js/fiscal/params/index.js
-  var PARAMETRI = { 2026: __default };
+  var PARAMETRI = { 2025: __default, 2026: __default2 };
   function parametriAnno(anno2) {
     const p = PARAMETRI[anno2];
     if (!p) throw new Error(`Parametri fiscali non disponibili per l'anno ${anno2}`);
     return p;
+  }
+  function anniDisponibili() {
+    return Object.keys(PARAMETRI).map(Number).sort();
+  }
+  function parametriPerAnno(anno2) {
+    const anni = anniDisponibili();
+    if (PARAMETRI[anno2]) return { params: PARAMETRI[anno2], esatto: true, annoUsato: anno2 };
+    const usato = anni.filter((a) => a < anno2).pop() ?? anni[0];
+    return { params: PARAMETRI[usato], esatto: false, annoUsato: usato };
   }
 
   // js/ui/sblocco.js
@@ -373,6 +534,8 @@
       ateco: [],
       previdenza: { tipo: "gestione-separata", altraCopertura: false, iscrittoDal1996: true, riduzione35: false, cassa: { aliquotaSoggettiva: 0.1, contributoMinimo: 0 } },
       startup: false,
+      scadenzeCassa: [],
+      // versamenti alla cassa professionale inseriti a mano {anno, data, descrizione, importo}
       versamenti: {},
       // per anno d'imposta: { sostitutiva, inps } acconti già versati
       note: ""
@@ -551,8 +714,9 @@
 
   // js/ui/clienti.js
   function vistaClienti(ctx) {
-    const { archivio: archivio2, dati, params: params2 } = ctx;
+    const { archivio: archivio2, dati } = ctx;
     const anno2 = (/* @__PURE__ */ new Date()).getFullYear();
+    const params2 = ctx.paramsAnno(anno2).params;
     const righe = dati.clienti.map((c) => {
       const r = riepilogoAnno(c, dati, anno2, params2);
       return h(
@@ -944,8 +1108,8 @@
   }
   function csvScadenzario(voci) {
     return generaCsv(
-      ["Scadenza", "Descrizione", "Importo", "Codice tributo F24", "Anno di riferimento", "Note"],
-      voci.map((v) => [dataIt2(v.data), v.descrizione, v.importo, v.codiceTributo ?? "", v.annoRiferimento ?? "", v.nota ?? ""])
+      ["Scadenza", "Descrizione", "Importo", "Codice F24 (tributo o causale INPS)", "Anno di riferimento", "Note"],
+      voci.map((v) => [dataIt2(v.data), v.descrizione, v.importo, v.codiceTributo ?? (v.causaleInps ? `INPS ${v.causaleInps}` : ""), v.annoRiferimento ?? "", v.nota ?? ""])
     );
   }
   function csvConfronto(confronto) {
@@ -957,6 +1121,7 @@
       ["Contributi previdenziali", f.contributi.totale, o.contributi.totale],
       ["Imponibile", f.imponibile, o.imponibile],
       ["Imposta (sostitutiva / IRPEF netta)", f.imposta, o.irpef],
+      ["di cui detrazione lavoro autonomo", 0, o.detrazioneAutonomi],
       ["Addizionali", 0, o.addizionali],
       ["IRAP", 0, o.irap],
       ["Totale imposte e contributi", f.totaleCarico, o.totaleCarico],
@@ -1559,9 +1724,10 @@
     "esce-subito": ["errore", "Superati 100.000 \u20AC.", "Uscita immediata dal regime: l\u2019IVA \xE8 dovuta dalle operazioni che hanno comportato il superamento."]
   };
   function vistaRiepilogo(ctx) {
-    const { dati, cliente: c, params: params2 } = ctx;
+    const { dati, cliente: c } = ctx;
     if (!c) return h("div", null, h("h1", null, "Riepilogo"), avviso("attenzione", "Nessun cliente selezionato.", "Creane uno dalla sezione Clienti."));
     const anno2 = ctx.stato.annoRiepilogo ?? (/* @__PURE__ */ new Date()).getFullYear();
+    const { params: params2, esatto, annoUsato } = ctx.paramsAnno(anno2);
     const r = riepilogoAnno(c, dati, anno2, params2);
     const [tipo, titolo, testo2] = MESSAGGI_SOGLIA[r.soglie.stato];
     const pct = Math.min(100, r.soglie.percentuale);
@@ -1579,6 +1745,7 @@
         ctx.stato.annoRiepilogo = Number(e.target.value);
         ctx.aggiorna();
       } })),
+      esatto ? null : avviso("attenzione", "Parametri non disponibili per questo anno.", `La stima usa i parametri ${annoUsato}.`),
       h(
         "div",
         { classe: "statistiche" },
@@ -1657,6 +1824,10 @@
     const pw = h("input", { type: "password", autocomplete: "current-password" });
     let blobDaImportare = null;
     const nomeFile = h("span", { classe: "tenue" });
+    const attuale = h("input", { type: "password", autocomplete: "current-password", required: true });
+    const nuova = h("input", { type: "password", autocomplete: "new-password", required: true, minlength: "10" });
+    const nuova2 = h("input", { type: "password", autocomplete: "new-password", required: true });
+    const esitoPw = h("div");
     return h(
       "div",
       null,
@@ -1700,21 +1871,61 @@
           }
         } }, "Ripristina"))
       ),
+      h(
+        "div",
+        { classe: "scheda" },
+        h("h2", null, "Cambia password"),
+        h("p", { classe: "tenue" }, "Dopo il cambio i backup gi\xE0 esportati restano apribili solo con la vecchia password: esportane uno nuovo."),
+        h(
+          "form",
+          { onSubmit: async (e) => {
+            e.preventDefault();
+            if (nuova.value !== nuova2.value) return esitoPw.replaceChildren(avviso("errore", "Le nuove password non coincidono."));
+            try {
+              await archivio2.cambiaPassword(attuale.value, nuova.value);
+              attuale.value = nuova.value = nuova2.value = "";
+              esitoPw.replaceChildren(avviso("ok", "Password cambiata."));
+            } catch (err) {
+              esitoPw.replaceChildren(avviso("errore", err instanceof ErrorePassword ? "Password attuale errata." : err.message));
+            }
+          } },
+          h(
+            "div",
+            { classe: "griglia" },
+            campo("Password attuale", attuale),
+            campo("Nuova password (almeno 10 caratteri)", nuova),
+            campo("Ripeti la nuova password", nuova2)
+          ),
+          esitoPw,
+          h("div", { classe: "azioni" }, h("button", { type: "submit", classe: "primario" }, "Cambia password"))
+        )
+      ),
       esito
     );
   }
 
   // js/fiscal/ordinario.js
+  function detrazioneLavoroAutonomo(redditoComplessivo, params2) {
+    const d = params2.irpef.detrazioneLavoroAutonomo;
+    const r = redditoComplessivo;
+    let importo = 0;
+    if (r <= d.finoA) importo = d.importoFisso;
+    else if (r <= d.finoA2) importo = d.base + d.extra * (d.finoA2 - r) / d.divisore;
+    else if (r <= d.finoA3) importo = d.base * (d.finoA3 - r) / d.divisore3;
+    if (importo > 0 && r > d.aumento.da && r <= d.aumento.a) importo += d.aumento.importo;
+    return round2(importo);
+  }
   function calcolaOrdinario(params2, dati) {
     const ricavi = dati.ricavi;
     const costi = dati.costi ?? 0;
     const redditoProfessionale = round2(clamp0(ricavi - costi));
     const contributi = contributiPrevidenziali(redditoProfessionale, params2, dati.previdenza);
     const imponibile = round2(clamp0(
-      redditoProfessionale + (dati.altriRedditi ?? 0) - contributi.totale - (dati.altreDeduzioni ?? 0)
+      redditoProfessionale + (dati.altriRedditi ?? 0) - contributi.totale - (dati.altreDeduzioni ?? 0) - (dati.perditePregresse ?? 0)
     ));
     const irpefLorda = applicaScaglioni(imponibile, params2.irpef.scaglioni);
-    const irpef = round2(clamp0(irpefLorda - (dati.detrazioni ?? 0)));
+    const detrazioneAutonomi = dati.senzaDetrazioneAutonomi ? 0 : detrazioneLavoroAutonomo(imponibile, params2);
+    const irpef = round2(clamp0(irpefLorda - detrazioneAutonomi - (dati.detrazioni ?? 0)));
     const addizionali = round2(
       imponibile * ((dati.addizionaleRegionale ?? 0) + (dati.addizionaleComunale ?? 0))
     );
@@ -1726,6 +1937,7 @@
       contributi,
       imponibile,
       irpefLorda,
+      detrazioneAutonomi,
       irpef,
       addizionali,
       irap,
@@ -1761,15 +1973,16 @@
   var num = (v) => Number.isFinite(Number(v)) ? Number(v) : 0;
   function vistaSimulazione(ctx) {
     var _a;
-    const { dati, cliente: c, params: params2 } = ctx;
+    const { dati, cliente: c } = ctx;
     if (!c) return h("div", null, h("h1", null, "Simulazione"), avviso("attenzione", "Nessun cliente selezionato."));
     const anno2 = ctx.stato.annoSim ?? (/* @__PURE__ */ new Date()).getFullYear();
+    const { params: params2, esatto, annoUsato } = ctx.paramsAnno(anno2);
     const r = riepilogoAnno(c, dati, anno2, params2);
     const voci = r.perAteco.filter((v) => v.coefficiente > 0);
     if (voci.length === 0) {
       return h("div", null, h("h1", null, "Simulazione"), avviso("attenzione", "Servono i codici ATECO.", "Assegna almeno un codice ATECO con coefficiente nell\u2019anagrafica del cliente."));
     }
-    const s = (_a = ctx.stato).sim ?? (_a.sim = { ricavi: null, costi: null, ricaviPct: 0, costiPct: 0, addReg: 1.73, addCom: 0.8, detrazioni: 0, altriRedditi: 0, irap: false });
+    const s = (_a = ctx.stato).sim ?? (_a.sim = { ricavi: null, costi: null, ricaviPct: 0, costiPct: 0, addReg: 1.73, addCom: 0.8, detrazioni: 0, altriRedditi: 0, perdite: 0, senzaDetrAut: false, irap: false });
     const ricaviBase = s.ricavi ?? r.ricavi;
     const costiBase = s.costi ?? r.spese;
     const risultati = h("div");
@@ -1785,7 +1998,7 @@
         aliquota: r.aliquota.aliquota,
         previdenza: c.previdenza,
         riduzione35: c.previdenza.riduzione35,
-        ordinario: { addizionaleRegionale: s.addReg / 100, addizionaleComunale: s.addCom / 100, detrazioni: s.detrazioni, altriRedditi: s.altriRedditi, soggettoIrap: s.irap }
+        ordinario: { addizionaleRegionale: s.addReg / 100, addizionaleComunale: s.addCom / 100, detrazioni: s.detrazioni, altriRedditi: s.altriRedditi, perditePregresse: s.perdite, senzaDetrazioneAutonomi: s.senzaDetrAut, soggettoIrap: s.irap }
       };
       const conf = confrontaRegimi(params2, input);
       const f = conf.forfettario, o = conf.ordinario;
@@ -1820,6 +2033,7 @@
               riga2("Contributi previdenziali", f.contributi.totale, o.contributi.totale),
               riga2("Imponibile fiscale", f.imponibile, o.imponibile),
               riga2(`Imposta (${percentuale(f.aliquota)} sostitutiva / IRPEF netta)`, f.imposta, o.irpef),
+              riga2("di cui detrazione lavoro autonomo (art. 13 c. 5 TUIR)", 0, o.detrazioneAutonomi),
               riga2("Addizionali regionale e comunale", 0, o.addizionali),
               riga2("IRAP", 0, o.irap),
               riga2("Totale imposte e contributi", f.totaleCarico, o.totaleCarico, true),
@@ -1849,7 +2063,7 @@
             riferimentoX: { valore: params2.forfettario.soglie.ricaviEsclusione, etichetta: "Soglia 85.000 \u20AC" }
           })
         ),
-        h("p", { classe: "tenue" }, "Semplificazioni: nel regime ordinario le detrazioni IRPEF sono un importo da inserire, l\u2019IVA \xE8 considerata neutra, e non sono modellati ammortamenti, perdite pregresse, deduzioni oltre ai contributi, n\xE9 i limiti all\u2019IRAP per i professionisti. Stima indicativa, da verificare con il commercialista.")
+        h("p", { classe: "tenue" }, "Semplificazioni: nel regime ordinario la detrazione per lavoro autonomo (art. 13 c. 5 TUIR) \xE8 calcolata in automatico; altre detrazioni e le perdite pregresse sono importi da inserire. L\u2019IVA \xE8 considerata neutra; ammortamenti e altre spese vanno inseriti tra i costi. Non sono modellati le altre deduzioni oltre ai contributi n\xE9 i limiti all\u2019IRAP per i professionisti. Stima indicativa, da verificare con il commercialista.")
       );
     }
     const slider = (etichetta, chiave, min, max) => {
@@ -1872,6 +2086,7 @@
       h("div", { classe: "solo-stampa" }, h("strong", null, `${c.nome} \u2014 simulazione forfettario / ordinario ${anno2}`), h("div", null, `Stampato il ${(/* @__PURE__ */ new Date()).toLocaleDateString("it-IT")}`)),
       h("h1", null, "Simulazione forfettario vs ordinario"),
       h("p", { classe: "tenue" }, `${c.nome}. Parti dai dati registrati e prova scenari diversi con i cursori.`),
+      esatto ? null : avviso("attenzione", "Parametri non disponibili per questo anno.", `Il confronto usa i parametri ${annoUsato}.`),
       h(
         "div",
         { classe: "scheda" },
@@ -1905,7 +2120,12 @@
             { classe: "griglia" },
             campo("Addizionale regionale (%)", numero("addReg", { step: "0.01" })),
             campo("Addizionale comunale (%)", numero("addCom", { step: "0.01" })),
-            campo("Detrazioni IRPEF spettanti (\u20AC)", numero("detrazioni")),
+            campo("Altre detrazioni IRPEF (\u20AC)", numero("detrazioni"), "La detrazione per lavoro autonomo \xE8 calcolata in automatico."),
+            campo("Perdite pregresse da riportare (\u20AC)", numero("perdite")),
+            h("label", { classe: "spunta" }, h("input", { type: "checkbox", checked: s.senzaDetrAut, onChange: (e) => {
+              s.senzaDetrAut = e.target.checked;
+              ricalcola();
+            } }), "Escludi la detrazione per lavoro autonomo"),
             campo("Altri redditi imponibili (\u20AC)", numero("altriRedditi")),
             h("label", { classe: "spunta" }, h("input", { type: "checkbox", checked: s.irap, onChange: (e) => {
               s.irap = e.target.checked;
@@ -1919,8 +2139,8 @@
   }
 
   // js/fiscal/acconti.js
-  function accontiSostitutiva(params2, impostaAnnoPrecedente) {
-    const a = params2.forfettario.acconto;
+  function accontiSostitutiva(params2, impostaAnnoPrecedente, percentualeRata1) {
+    const a = { ...params2.forfettario.acconto, ...percentualeRata1 !== void 0 ? { percentualeRata1 } : {} };
     if (impostaAnnoPrecedente <= a.sogliaMinima) return { prima: 0, seconda: 0, totale: 0 };
     if (impostaAnnoPrecedente <= a.sogliaRataUnica) {
       return { prima: 0, seconda: round2(impostaAnnoPrecedente), totale: round2(impostaAnnoPrecedente) };
@@ -1962,7 +2182,7 @@
     const dataGiugno = d.prorogaEstate2026 && P === 2026 ? scadenza(P, fp.scadenze.saldoEPrimoAccontoProroga2026) : scadenza(P, fp.scadenze.saldoEPrimoAcconto);
     const dataNovembre = scadenza(P, fp.scadenze.secondoAcconto);
     const saldo = round2(d.impostaAnnoPrec - d.accontiSostitutivaVersati);
-    const acc = accontiSostitutiva(params2, d.impostaAnnoPrec);
+    const acc = accontiSostitutiva(params2, d.impostaAnnoPrec, d.percentualeRata1);
     voci.push({
       id: "sost-saldo",
       tipo: "imposta",
@@ -1996,9 +2216,15 @@
     const prev = d.previdenza;
     const inps = d.contributiAnnoPrec;
     if (prev.tipo === "gestione-separata") {
-      const a = params2.gestioneSeparata.acconto;
+      const gs = params2.gestioneSeparata;
+      const a = gs.acconto;
+      const aliquota = prev.altraCopertura ? gs.aliquotaConAltraCopertura : gs.aliquotaProfessionistaSenzaCopertura;
+      const causale = prev.altraCopertura ? gs.causaliF24.altraCopertura : gs.causaliF24.standard;
       const saldoInps = round2(inps.totale - d.accontiInpsVersati);
-      const rata = round2(inps.totale * a.percentuale / a.rate);
+      const baseAcc = Math.min(clamp0(d.redditoAnnoPrec ?? inps.totale / aliquota), gs.massimale) * a.percentuale;
+      const totaleAcc = round2(baseAcc * aliquota);
+      const rata1 = round2(totaleAcc / a.rate);
+      const rata2 = round2(totaleAcc - rata1);
       voci.push({
         id: "inps-saldo",
         tipo: "inps",
@@ -2006,28 +2232,33 @@
         descrizione: `Saldo contributi Gestione Separata ${P - 1}`,
         importo: clamp0(saldoInps),
         annoRiferimento: P - 1,
+        causaleInps: causale,
         nota: saldoInps < 0 ? "Credito" : ""
       });
-      voci.push({ id: "inps-acc1", tipo: "inps", data: dataGiugno, descrizione: `Primo acconto contributi Gestione Separata ${P}`, importo: rata, annoRiferimento: P, nota: `${a.percentuale * 100 / a.rate}% dei contributi ${P - 1}` });
-      voci.push({ id: "inps-acc2", tipo: "inps", data: dataNovembre, descrizione: `Secondo acconto contributi Gestione Separata ${P}`, importo: rata, annoRiferimento: P, nota: `${a.percentuale * 100 / a.rate}% dei contributi ${P - 1}` });
+      voci.push({ id: "inps-acc1", tipo: "inps", data: dataGiugno, descrizione: `Primo acconto contributi Gestione Separata ${P}`, importo: rata1, annoRiferimento: P, causaleInps: causale, nota: `${(aliquota * 100).toFixed(2).replace(".", ",")}% sull'80% del reddito ${P - 1}, in due rate uguali` });
+      voci.push({ id: "inps-acc2", tipo: "inps", data: dataNovembre, descrizione: `Secondo acconto contributi Gestione Separata ${P}`, importo: rata2, annoRiferimento: P, causaleInps: causale, nota: "Seconda rata di pari importo" });
     } else if (prev.tipo === "artigiani" || prev.tipo === "commercianti") {
       const ivs = params2.ivs;
       const fisso = d.contributiFissiAnno ?? round2((ivs.minimale * ivs.aliquote[prev.tipo] + ivs.contributoMaternitaAnnuo) * (prev.riduzione35 ? 1 - fp.riduzioneContributiIvs : 1));
       ivs.scadenzeFissi.forEach((mmgg, i) => {
         const anno2 = mmgg === "02-16" ? P + 1 : P;
-        voci.push({ id: `inps-fisso-${i + 1}`, tipo: "inps", data: scadenza(anno2, mmgg), descrizione: `Contributi fissi IVS ${P}, rata ${i + 1} di 4`, importo: round2(fisso / 4), annoRiferimento: P, nota: "Versamento con F24 INPS" });
+        voci.push({ id: `inps-fisso-${i + 1}`, tipo: "inps", data: scadenza(anno2, mmgg), descrizione: `Contributi fissi IVS ${P}, rata ${i + 1} di 4`, importo: round2(fisso / 4), annoRiferimento: P, causaleInps: ivs.causaliF24[prev.tipo].minimale, nota: "Versamento con F24 INPS" });
       });
       const fissoPrec = d.contributiFissiAnnoPrec ?? fisso;
       const eccedenzaPrec = clamp0(round2(inps.totale - fissoPrec));
       const saldoEcc = round2(eccedenzaPrec - d.accontiInpsVersati);
       const rataEcc = round2(eccedenzaPrec * ivs.acconto.percentuale / ivs.acconto.rate);
-      voci.push({ id: "inps-saldo", tipo: "inps", data: dataGiugno, descrizione: `Saldo contributi sul reddito eccedente il minimale ${P - 1}`, importo: clamp0(saldoEcc), annoRiferimento: P - 1, nota: saldoEcc < 0 ? "Credito" : "" });
+      voci.push({ id: "inps-saldo", tipo: "inps", data: dataGiugno, descrizione: `Saldo contributi sul reddito eccedente il minimale ${P - 1}`, importo: clamp0(saldoEcc), annoRiferimento: P - 1, causaleInps: ivs.causaliF24[prev.tipo].eccedenza, nota: saldoEcc < 0 ? "Credito" : "" });
       if (rataEcc > 0) {
-        voci.push({ id: "inps-acc1", tipo: "inps", data: dataGiugno, descrizione: `Primo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, nota: "Regola di acconto da verificare" });
-        voci.push({ id: "inps-acc2", tipo: "inps", data: dataNovembre, descrizione: `Secondo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, nota: "Regola di acconto da verificare" });
+        voci.push({ id: "inps-acc1", tipo: "inps", data: dataGiugno, descrizione: `Primo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, causaleInps: ivs.causaliF24[prev.tipo].eccedenza, nota: "Misura dell\u2019acconto (80%) da confermare nel Cassetto previdenziale" });
+        voci.push({ id: "inps-acc2", tipo: "inps", data: dataNovembre, descrizione: `Secondo acconto contributi sul reddito eccedente ${P}`, importo: rataEcc, annoRiferimento: P, causaleInps: ivs.causaliF24[prev.tipo].eccedenza, nota: "Misura dell\u2019acconto (80%) da confermare nel Cassetto previdenziale" });
       }
     } else {
-      voci.push({ id: "inps-cassa", tipo: "inps", data: null, descrizione: "Contributi alla cassa professionale", importo: 0, nota: "Scadenze e importi definiti dalla cassa di appartenenza: non calcolati." });
+      const manuali = d.scadenzeManuali ?? [];
+      if (manuali.length === 0) {
+        voci.push({ id: "inps-cassa", tipo: "inps", data: null, descrizione: "Contributi alla cassa professionale", importo: 0, nota: "Scadenze e importi definiti dalla cassa di appartenenza: inseriscili a mano nella sezione dedicata." });
+      }
+      manuali.forEach((m, i) => voci.push({ id: `cassa-${i}`, tipo: "inps", data: m.data ? prossimoLavorativo(m.data) : null, descrizione: m.descrizione || "Contributo cassa professionale", importo: round2(m.importo ?? 0), nota: m.nota ?? "Inserito manualmente" }));
     }
     voci.push({ id: "dichiarazione", tipo: "adempimento", data: scadenza(P, fp.scadenze.dichiarazione), descrizione: `Invio dichiarazione dei redditi (anno d'imposta ${P - 1})`, importo: 0, annoRiferimento: P - 1, nota: "" });
     return voci.sort((a, b) => (a.data ?? "9999").localeCompare(b.data ?? "9999") || a.id.localeCompare(b.id));
@@ -2038,18 +2269,22 @@
   var oggi = () => (/* @__PURE__ */ new Date()).toISOString().slice(0, 10);
   function vistaScadenze(ctx) {
     var _a;
-    const { archivio: archivio2, dati, cliente: c, params: params2 } = ctx;
+    const { archivio: archivio2, dati, cliente: c } = ctx;
     if (!c) return h("div", null, h("h1", null, "Scadenzario"), avviso("attenzione", "Nessun cliente selezionato."));
     const P = ctx.stato.annoScadenze ?? (/* @__PURE__ */ new Date()).getFullYear();
-    const prec = riepilogoAnno(c, dati, P - 1, params2);
+    const { params: params2, esatto, annoUsato } = ctx.paramsAnno(P);
+    const pPrec = ctx.paramsAnno(P - 1);
+    const prec = riepilogoAnno(c, dati, P - 1, pPrec.params);
     const versati = c.versamenti?.[P - 1] ?? {};
     const stimaImposta = prec.forfettario?.imposta ?? 0;
+    const stimaReddito = prec.forfettario?.redditoLordo ?? 0;
     const stimaContributi = prec.forfettario?.contributi ?? { totale: 0 };
+    const eCassa = c.previdenza.tipo === "cassa";
     const s = (_a = ctx.stato).scad ?? (_a.scad = {});
-    if (s.anno !== P) Object.assign(s, { anno: P, imposta: null, contributi: null, accSost: null, accInps: null, proroga: P === 2026 });
+    if (s.anno !== P) Object.assign(s, { anno: P, imposta: null, reddito: null, contributi: null, accSost: null, accInps: null, proroga: P === 2026, rata1: 0.5 });
     const val = (chiave, predefinito) => s[chiave] ?? predefinito;
+    const manuali = c.scadenzeCassa ?? [];
     const risultati = h("div");
-    const esito = h("div");
     function ricalcola() {
       const contributi = { ...stimaContributi, totale: val("contributi", stimaContributi.totale) };
       const voci = calcolaScadenzario(params2, {
@@ -2057,13 +2292,17 @@
         impostaAnnoPrec: val("imposta", stimaImposta),
         accontiSostitutivaVersati: val("accSost", versati.sostitutiva ?? 0),
         contributiAnnoPrec: contributi,
+        redditoAnnoPrec: val("reddito", stimaReddito),
         accontiInpsVersati: val("accInps", versati.inps ?? 0),
         previdenza: c.previdenza,
-        prorogaEstate2026: s.proroga
+        prorogaEstate2026: s.proroga,
+        percentualeRata1: s.rata1,
+        scadenzeManuali: manuali.filter((m) => m.anno === P)
       });
       const futuri = voci.filter((v) => v.data && v.data >= oggi() && v.importo > 0);
       const totale = round2(voci.reduce((t, v) => t + v.importo, 0));
       const prossima = futuri[0];
+      const f24 = (v) => v.codiceTributo ? `Erario ${v.codiceTributo} / ${v.annoRiferimento}` : v.causaleInps ? `INPS ${v.causaleInps}` : v.tipo === "inps" ? "INPS" : "";
       risultati.replaceChildren(
         prossima ? avviso("attenzione", `Prossima scadenza: ${dataIt(prossima.data)}.`, `${prossima.descrizione} \u2014 ${euro(prossima.importo)}`) : avviso("ok", "Nessuna scadenza futura con importo per questo anno."),
         h(
@@ -2078,7 +2317,7 @@
               null,
               h("td", null, v.data ? dataIt(v.data) : "\u2014", v.data && v.data < oggi() ? h("div", { classe: "tenue" }, "scaduta") : null),
               h("td", null, v.descrizione, v.nota ? h("div", { classe: "tenue" }, v.nota) : null),
-              h("td", null, v.codiceTributo ? `Erario ${v.codiceTributo} / ${v.annoRiferimento}` : v.tipo === "inps" ? "INPS" : ""),
+              h("td", null, f24(v)),
               h("td", { classe: "numero" }, v.tipo === "adempimento" ? "" : euro(v.importo))
             ))),
             h("tfoot", null, h("tr", null, h("td", { colspan: "3" }, "Totale versamenti"), h("td", { classe: "numero" }, euro(totale))))
@@ -2096,7 +2335,49 @@
       s[chiave] = num2(e.target.value);
       ricalcola();
     } });
-    const inpsEtichetta = c.previdenza.tipo === "artigiani" || c.previdenza.tipo === "commercianti" ? "Contributi INPS dovuti per l\u2019anno precedente, fissi inclusi (\u20AC)" : "Contributi INPS dovuti per l\u2019anno precedente (\u20AC)";
+    const ivs = c.previdenza.tipo === "artigiani" || c.previdenza.tipo === "commercianti";
+    const inpsEtichetta = ivs ? "Contributi INPS dovuti per l\u2019anno precedente, fissi inclusi (\u20AC)" : "Contributi INPS dovuti per l\u2019anno precedente (\u20AC)";
+    const nuovaManuale = { data: "", descrizione: "", importo: 0 };
+    const sezioneCassa = !eCassa ? null : h(
+      "div",
+      { classe: "scheda" },
+      h("h2", null, "Versamenti alla cassa professionale"),
+      h("p", { classe: "tenue" }, "Importi e scadenze dipendono dalla cassa di appartenenza: inseriscili dal regolamento o dalla comunicazione della cassa."),
+      manuali.filter((m) => m.anno === P).length === 0 ? null : h("ul", null, manuali.map((m, i) => m.anno !== P ? null : h(
+        "li",
+        null,
+        `${dataIt(m.data)} \u2014 ${m.descrizione}: ${euro(m.importo)} `,
+        h("button", { classe: "pericolo", onClick: async () => {
+          await archivio2.modifica((d) => {
+            d.clienti.find((x) => x.id === c.id).scadenzeCassa.splice(i, 1);
+          });
+        } }, "Rimuovi")
+      ))),
+      h(
+        "form",
+        { onSubmit: async (e) => {
+          e.preventDefault();
+          await archivio2.modifica((d) => {
+            const cl = d.clienti.find((x) => x.id === c.id);
+            cl.scadenzeCassa = [...cl.scadenzeCassa ?? [], { ...nuovaManuale, anno: P }];
+          });
+        } },
+        h(
+          "div",
+          { classe: "griglia" },
+          campo("Data", h("input", { type: "date", required: true, onInput: (e) => {
+            nuovaManuale.data = e.target.value;
+          } })),
+          campo("Descrizione", h("input", { type: "text", required: true, onInput: (e) => {
+            nuovaManuale.descrizione = e.target.value;
+          } })),
+          campo("Importo (\u20AC)", h("input", { type: "number", step: "0.01", min: "0", required: true, onInput: (e) => {
+            nuovaManuale.importo = num2(e.target.value);
+          } }))
+        ),
+        h("div", { classe: "azioni" }, h("button", { type: "submit" }, "Aggiungi versamento"))
+      )
+    );
     ricalcola();
     return h(
       "div",
@@ -2104,6 +2385,7 @@
       h("div", { classe: "solo-stampa" }, h("strong", null, `${c.nome} \u2014 scadenzario ${P}`), h("div", null, `Stampato il ${(/* @__PURE__ */ new Date()).toLocaleDateString("it-IT")}`)),
       h("h1", null, "Scadenzario"),
       h("p", { classe: "tenue" }, `${c.nome}. Versamenti dell\u2019anno ${P}: saldo ${P - 1} e acconti ${P}.`),
+      esatto ? null : avviso("attenzione", "Parametri non disponibili per questo anno.", `Date e aliquote usano i parametri ${annoUsato}.`),
       h(
         "div",
         { classe: "scheda" },
@@ -2116,8 +2398,22 @@
           } })),
           campo(`Imposta sostitutiva dovuta per il ${P - 1} (\u20AC)`, numero("imposta", stimaImposta), `Stima dai dati registrati: ${euro(stimaImposta)}. Correggila con il valore della dichiarazione.`),
           campo(`Acconti imposta gi\xE0 versati per il ${P - 1} (\u20AC)`, numero("accSost", versati.sostitutiva ?? 0)),
-          campo(inpsEtichetta, numero("contributi", stimaContributi.totale), `Stima: ${euro(stimaContributi.totale)}.`),
-          campo(`Acconti INPS gi\xE0 versati per il ${P - 1} (\u20AC)`, numero("accInps", versati.inps ?? 0))
+          c.previdenza.tipo === "gestione-separata" ? campo(`Reddito ${P - 1} per l\u2019acconto INPS (\u20AC)`, numero("reddito", stimaReddito), "Base di calcolo degli acconti della Gestione Separata.") : null,
+          eCassa ? null : campo(inpsEtichetta, numero("contributi", stimaContributi.totale), `Stima: ${euro(stimaContributi.totale)}.`),
+          eCassa ? null : campo(`Acconti INPS gi\xE0 versati per il ${P - 1} (\u20AC)`, numero("accInps", versati.inps ?? 0)),
+          campo(
+            "Ripartizione acconti imposta sostitutiva",
+            h(
+              "select",
+              { onChange: (e) => {
+                s.rata1 = Number(e.target.value);
+                ricalcola();
+              } },
+              h("option", { value: "0.5", selected: s.rata1 === 0.5 }, "50% + 50%"),
+              h("option", { value: "0.4", selected: s.rata1 === 0.4 }, "40% + 60%")
+            ),
+            "Le istruzioni Redditi PF 2026 indicano il 50% solo per i soggetti ISA e il 40% negli altri casi."
+          )
         ),
         P === 2026 ? h("label", { classe: "spunta" }, h("input", { type: "checkbox", checked: s.proroga, onChange: (e) => {
           s.proroga = e.target.checked;
@@ -2130,9 +2426,9 @@
           });
         } }, "Salva acconti versati"))
       ),
-      esito,
+      sezioneCassa,
       risultati,
-      avviso("attenzione", "Stima indicativa.", `Gli importi dell\u2019anno ${P - 1} sono ricavati dai dati registrati con i parametri 2026. I codici tributo F24 sono quelli dell\u2019imposta sostitutiva; per i contributi INPS i codici e le causali vanno verificati. L\u2019acconto della Gestione Separata (80% in due rate) e quello sul reddito eccedente IVS sono da verificare.`)
+      avviso("attenzione", "Stima indicativa.", `Gli importi dell\u2019anno ${P - 1} sono ricavati dai dati registrati con i parametri ${pPrec.annoUsato}. Per artigiani e commercianti gli importi ufficiali sono nel Cassetto previdenziale INPS (\u201CDati del mod. F24\u201D): la misura degli acconti sulla quota eccedente il minimale (80%) non \xE8 confermata nelle circolari lette. L\u2019acconto della Gestione Separata segue le istruzioni Redditi PF (aliquota dell\u2019anno sull\u201980% del reddito dell\u2019anno precedente, in due rate uguali).`)
     );
   }
 
@@ -2163,6 +2459,7 @@
       dati,
       cliente,
       params: params(),
+      paramsAnno: parametriPerAnno,
       stato,
       aggiorna: disegna,
       selezionaCliente: async (id2, dest) => {

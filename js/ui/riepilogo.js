@@ -11,9 +11,10 @@ const MESSAGGI_SOGLIA = {
 };
 
 export function vistaRiepilogo(ctx) {
-  const { dati, cliente: c, params } = ctx;
+  const { dati, cliente: c } = ctx;
   if (!c) return h('div', null, h('h1', null, 'Riepilogo'), avviso('attenzione', 'Nessun cliente selezionato.', 'Creane uno dalla sezione Clienti.'));
   const anno = ctx.stato.annoRiepilogo ?? new Date().getFullYear();
+  const { params, esatto, annoUsato } = ctx.paramsAnno(anno);
   const r = riepilogoAnno(c, dati, anno, params);
   const [tipo, titolo, testo] = MESSAGGI_SOGLIA[r.soglie.stato];
   const pct = Math.min(100, r.soglie.percentuale);
@@ -27,6 +28,7 @@ export function vistaRiepilogo(ctx) {
     h('h1', null, 'Riepilogo'),
     h('p', { classe: 'tenue' }, c.nome),
     campo('Anno d’imposta', h('input', { type: 'number', min: '2000', max: '2100', valore: anno, onChange: (e) => { ctx.stato.annoRiepilogo = Number(e.target.value); ctx.aggiorna(); } })),
+    esatto ? null : avviso('attenzione', 'Parametri non disponibili per questo anno.', `La stima usa i parametri ${annoUsato}.`),
     h('div', { classe: 'statistiche' },
       h('div', { classe: 'statistica' }, h('div', { classe: 'valore' }, euro(r.ricavi)), h('div', { classe: 'etichetta' }, `Ricavi incassati ${anno}`)),
       h('div', { classe: 'statistica' }, h('div', { classe: 'valore' }, euro(r.daIncassare)), h('div', { classe: 'etichetta' }, 'Fatturato da incassare')),

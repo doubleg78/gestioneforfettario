@@ -9,17 +9,18 @@ import { round2 } from '../fiscal/utils.js';
 const num = (v) => (Number.isFinite(Number(v)) ? Number(v) : 0);
 
 export function vistaSimulazione(ctx) {
-  const { dati, cliente: c, params } = ctx;
+  const { dati, cliente: c } = ctx;
   if (!c) return h('div', null, h('h1', null, 'Simulazione'), avviso('attenzione', 'Nessun cliente selezionato.'));
 
   const anno = ctx.stato.annoSim ?? new Date().getFullYear();
+  const { params, esatto, annoUsato } = ctx.paramsAnno(anno);
   const r = riepilogoAnno(c, dati, anno, params);
   const voci = r.perAteco.filter((v) => v.coefficiente > 0);
   if (voci.length === 0) {
     return h('div', null, h('h1', null, 'Simulazione'), avviso('attenzione', 'Servono i codici ATECO.', 'Assegna almeno un codice ATECO con coefficiente nell’anagrafica del cliente.'));
   }
 
-  const s = ctx.stato.sim ??= { ricavi: null, costi: null, ricaviPct: 0, costiPct: 0, addReg: 1.73, addCom: 0.8, detrazioni: 0, altriRedditi: 0, irap: false };
+  const s = ctx.stato.sim ??= { ricavi: null, costi: null, ricaviPct: 0, costiPct: 0, addReg: 1.73, addCom: 0.8, detrazioni: 0, altriRedditi: 0, perdite: 0, senzaDetrAut: false, irap: false };
   const ricaviBase = s.ricavi ?? r.ricavi;
   const costiBase = s.costi ?? r.spese;
   const risultati = h('div');
@@ -32,7 +33,7 @@ export function vistaSimulazione(ctx) {
     const input = {
       ricavi, costiReali: costi, ricaviPerAteco: ripartiti, aliquota: r.aliquota.aliquota,
       previdenza: c.previdenza, riduzione35: c.previdenza.riduzione35,
-      ordinario: { addizionaleRegionale: s.addReg / 100, addizionaleComunale: s.addCom / 100, detrazioni: s.detrazioni, altriRedditi: s.altriRedditi, soggettoIrap: s.irap },
+      ordinario: { addizionaleRegionale: s.addReg / 100, addizionaleComunale: s.addCom / 100, detrazioni: s.detrazioni, altriRedditi: s.altriRedditi, perditePregresse: s.perdite, senzaDetrazioneAutonomi: s.senzaDetrAut, soggettoIrap: s.irap },
     };
     const conf = confrontaRegimi(params, input);
     const f = conf.forfettario, o = conf.ordinario;
@@ -61,6 +62,7 @@ export function vistaSimulazione(ctx) {
             riga('Contributi previdenziali', f.contributi.totale, o.contributi.totale),
             riga('Imponibile fiscale', f.imponibile, o.imponibile),
             riga(`Imposta (${percentuale(f.aliquota)} sostitutiva / IRPEF netta)`, f.imposta, o.irpef),
+            riga('di cui detrazione lavoro autonomo (art. 13 c. 5 TUIR)', 0, o.detrazioneAutonomi),
             riga('Addizionali regionale e comunale', 0, o.addizionali),
             riga('IRAP', 0, o.irap),
             riga('Totale imposte e contributi', f.totaleCarico, o.totaleCarico, true),
@@ -80,7 +82,7 @@ export function vistaSimulazione(ctx) {
           ],
           riferimentoX: { valore: params.forfettario.soglie.ricaviEsclusione, etichetta: 'Soglia 85.000 €' },
         })),
-      h('p', { classe: 'tenue' }, 'Semplificazioni: nel regime ordinario le detrazioni IRPEF sono un importo da inserire, l’IVA è considerata neutra, e non sono modellati ammortamenti, perdite pregresse, deduzioni oltre ai contributi, né i limiti all’IRAP per i professionisti. Stima indicativa, da verificare con il commercialista.'));
+      h('p', { classe: 'tenue' }, 'Semplificazioni: nel regime ordinario la detrazione per lavoro autonomo (art. 13 c. 5 TUIR) è calcolata in automatico; altre detrazioni e le perdite pregresse sono importi da inserire. L’IVA è considerata neutra; ammortamenti e altre spese vanno inseriti tra i costi. Non sono modellati le altre deduzioni oltre ai contributi né i limiti all’IRAP per i professionisti. Stima indicativa, da verificare con il commercialista.'));
   }
 
   const slider = (etichetta, chiave, min, max) => {
@@ -95,6 +97,7 @@ export function vistaSimulazione(ctx) {
     h('div', { classe: 'solo-stampa' }, h('strong', null, `${c.nome} — simulazione forfettario / ordinario ${anno}`), h('div', null, `Stampato il ${new Date().toLocaleDateString('it-IT')}`)),
     h('h1', null, 'Simulazione forfettario vs ordinario'),
     h('p', { classe: 'tenue' }, `${c.nome}. Parti dai dati registrati e prova scenari diversi con i cursori.`),
+    esatto ? null : avviso('attenzione', 'Parametri non disponibili per questo anno.', `Il confronto usa i parametri ${annoUsato}.`),
     h('div', { classe: 'scheda' },
       h('h2', null, 'Punto di partenza'),
       h('div', { classe: 'griglia' },
@@ -108,7 +111,9 @@ export function vistaSimulazione(ctx) {
         h('div', { classe: 'griglia' },
           campo('Addizionale regionale (%)', numero('addReg', { step: '0.01' })),
           campo('Addizionale comunale (%)', numero('addCom', { step: '0.01' })),
-          campo('Detrazioni IRPEF spettanti (€)', numero('detrazioni')),
+          campo('Altre detrazioni IRPEF (€)', numero('detrazioni'), 'La detrazione per lavoro autonomo è calcolata in automatico.'),
+          campo('Perdite pregresse da riportare (€)', numero('perdite')),
+          h('label', { classe: 'spunta' }, h('input', { type: 'checkbox', checked: s.senzaDetrAut, onChange: (e) => { s.senzaDetrAut = e.target.checked; ricalcola(); } }), 'Escludi la detrazione per lavoro autonomo'),
           campo('Altri redditi imponibili (€)', numero('altriRedditi')),
           h('label', { classe: 'spunta' }, h('input', { type: 'checkbox', checked: s.irap, onChange: (e) => { s.irap = e.target.checked; ricalcola(); } }), 'Soggetto a IRAP (3,9%)')))),
     risultati);

@@ -67,3 +67,18 @@ test('salvataggi concorrenti non si perdono', async () => {
   await lettura.sblocca('pw');
   assert.equal(lettura.dati.spese.length, 5);
 });
+
+test('cambio password: la vecchia non funziona più, la nuova sì, i dati restano', async () => {
+  const a = adattatoreMemoria();
+  const arch = nuovo(a);
+  await arch.crea('password-vecchia');
+  await arch.modifica((d) => d.clienti.push({ id: '1', nome: 'Mario' }));
+  await assert.rejects(() => arch.cambiaPassword('sbagliata', 'password-nuova-1'), ErrorePassword);
+  await assert.rejects(() => arch.cambiaPassword('password-vecchia', 'corta'), /almeno 10/);
+  await arch.cambiaPassword('password-vecchia', 'password-nuova-1');
+  await arch.modifica((d) => d.clienti.push({ id: '2', nome: 'Luisa' }));
+  await assert.rejects(() => nuovo(a).sblocca('password-vecchia'), ErrorePassword);
+  const lettura = nuovo(a);
+  await lettura.sblocca('password-nuova-1');
+  assert.deepEqual(lettura.dati.clienti.map((c) => c.nome), ['Mario', 'Luisa']);
+});

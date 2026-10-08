@@ -103,10 +103,21 @@ Fatto:
 - **Output**: CSV (fatture, confronto, scadenzario; separatore `;`, virgola decimale, protezione da formule) e stampa/PDF dal browser.
 - Provato in Chromium da `file://` con un cliente di esempio: i numeri di simulazione e scadenzario sono stati ricontrollati a mano.
 
-Da verificare o mancante:
-- Acconto Gestione Separata (80% in due rate) e acconti IVS sull'eccedenza: regola non verificata su fonte ufficiale (`daVerificare` nei parametri).
-- Codici tributo e causali INPS per l'F24: non inclusi.
-- Casse professionali: nessuno scadenzario (importi e date dipendono dalla cassa).
-- Ordinario: detrazioni IRPEF da inserire a mano, IVA neutra, niente ammortamenti, perdite pregresse o altre deduzioni.
-- Scadenzario e simulazione usano i parametri 2026 anche per l'anno precedente.
-- Il PDF si ottiene con "Stampa / PDF" del browser (nessuna libreria PDF).
+## Approfondimento dei punti aperti (fase 3)
+
+| Punto | Esito | Fonte |
+|---|---|---|
+| Acconto Gestione Separata | **Verificato**: due acconti di pari importo, alle scadenze degli acconti IRPEF; totale = aliquote dell'anno corrente sull'80% del reddito di lavoro autonomo dell'anno precedente, nel limite del massimale dell'anno corrente. Corretto il calcolo (prima usavo l'80% dei contributi dell'anno prima) | AdE, Redditi PF 2026 fasc. 2 (Quadro RR) |
+| Causali F24 Gestione Separata | **Verificato**: PXX (aliquota 26,07%), P10 (aliquota 24%) | AdE Redditi PF 2026; INPS circ. 105/2025 |
+| Causali F24 artigiani/commercianti | AF/CF (minimale), AP/CP (eccedenza), con rateazione APR/CPR e interessi API/CPI | INPS, pagina "F24 per artigiani e commercianti" |
+| Rate contributi fissi IVS | **Corretto**: 16/5, 20/8, 16/11, 16/2 (nominali; nel 2026 18/5 perché 16/5 è sabato). Avevo 17/11 da fonte secondaria | INPS circ. 14/2026 p. 9 |
+| Acconti IVS sulla quota eccedente | Date verificate (saldo, primo e secondo acconto alle scadenze IRPEF). Misura dell'80% in due rate **non confermata** nelle circolari: importi ufficiali nel Cassetto previdenziale INPS | INPS circ. 14/2026 |
+| Acconti imposta sostitutiva forfettari | Le istruzioni Redditi PF 2026 indicano **40% + 60%** in generale e 50% + 50% solo per i soggetti ISA (art. 17 c. 3 DPR 435/2001); cedolare secca 40/60. Per i forfettari le istruzioni del quadro LM non specificano. Resta la scelta dell'utente (50/50): ora selezionabile nello Scadenzario | AdE, Redditi PF 2026 fasc. 1 (RN62) |
+| Detrazione lavoro autonomo ordinario | Implementata: art. 13 c. 5 e 5-ter TUIR (1.265 € fino a 5.500; 500 + 765 × (28.000 − R) / 22.500 fino a 28.000; 500 × (50.000 − R) / 22.000 fino a 50.000; +50 € tra 11.000 e 17.000) | testo del TUIR da siti giuridici (Brocardi/Lexplain), non da Normattiva |
+| Parametri 2025 | Aggiunti: Gestione Separata (circ. INPS 27/2025), IVS (circ. 38/2025), IRPEF con secondo scaglione al 35%. Per anni senza parametri l'app usa i più vicini e avvisa | INPS; fonti secondarie per IRPEF 2025 |
+| Casse professionali | Inserimento manuale dei versamenti (data, descrizione, importo) per cliente e anno: nessuna tabella per cassa, perché importi e date variano e non sono stati verificati | — |
+| Perdite pregresse, altre detrazioni | Campi di inserimento nella simulazione | — |
+| Cambio password | Fatto (Backup → Cambia password) | — |
+| PDF | Resta "Stampa / PDF" del browser | — |
+
+Ancora fuori perimetro: IVA, ammortamenti, deduzioni diverse dai contributi, limiti IRAP per professionisti, tabella dati per cassa, conversione ATECO non univoca (l'app fa scegliere all'utente).

@@ -6,8 +6,8 @@ import { round2 } from './utils.js';
  * - fino a 257,52 € : rata unica a novembre
  * - oltre: due rate (50% a giugno, 50% a novembre)
  */
-export function accontiSostitutiva(params, impostaAnnoPrecedente) {
-  const a = params.forfettario.acconto;
+export function accontiSostitutiva(params, impostaAnnoPrecedente, percentualeRata1) {
+  const a = { ...params.forfettario.acconto, ...(percentualeRata1 !== undefined ? { percentualeRata1 } : {}) };
   if (impostaAnnoPrecedente <= a.sogliaMinima) return { prima: 0, seconda: 0, totale: 0 };
   if (impostaAnnoPrecedente <= a.sogliaRataUnica) {
     return { prima: 0, seconda: round2(impostaAnnoPrecedente), totale: round2(impostaAnnoPrecedente) };

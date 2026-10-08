@@ -1,4 +1,4 @@
-import { nuovaSessione, sigilla, apri } from './crypto.js';
+import { nuovaSessione, sigilla, apri, ErrorePassword } from './crypto.js';
 
 const CHIAVE = 'archivio';
 
@@ -32,6 +32,16 @@ export class Archivio {
     const { sessione, dati } = await apri(blob, password);
     this.sessione = sessione;
     this.dati = dati;
+  }
+
+  /** Cambia la password: verifica quella attuale, poi risigilla l'archivio con salt e chiave nuovi. */
+  async cambiaPassword(attuale, nuova) {
+    if (!this.sbloccato) throw new Error('Archivio bloccato');
+    if (nuova.length < 10) throw new Error('La nuova password deve avere almeno 10 caratteri');
+    const blob = await this.adattatore.leggi(CHIAVE);
+    try { await apri(blob, attuale); } catch { throw new ErrorePassword(); }
+    this.sessione = await nuovaSessione(nuova, this.iterazioni);
+    await this.salva();
   }
 
   blocca() { this.sessione = null; this.dati = null; this._notifica(); }

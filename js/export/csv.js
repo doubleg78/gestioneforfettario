@@ -23,8 +23,8 @@ export function csvFatture(fatture) {
 
 export function csvScadenzario(voci) {
   return generaCsv(
-    ['Scadenza', 'Descrizione', 'Importo', 'Codice tributo F24', 'Anno di riferimento', 'Note'],
-    voci.map((v) => [dataIt(v.data), v.descrizione, v.importo, v.codiceTributo ?? '', v.annoRiferimento ?? '', v.nota ?? '']),
+    ['Scadenza', 'Descrizione', 'Importo', 'Codice F24 (tributo o causale INPS)', 'Anno di riferimento', 'Note'],
+    voci.map((v) => [dataIt(v.data), v.descrizione, v.importo, v.codiceTributo ?? (v.causaleInps ? `INPS ${v.causaleInps}` : ''), v.annoRiferimento ?? '', v.nota ?? '']),
   );
 }
 
@@ -37,6 +37,7 @@ export function csvConfronto(confronto) {
     ['Contributi previdenziali', f.contributi.totale, o.contributi.totale],
     ['Imponibile', f.imponibile, o.imponibile],
     ['Imposta (sostitutiva / IRPEF netta)', f.imposta, o.irpef],
+    ['di cui detrazione lavoro autonomo', 0, o.detrazioneAutonomi],
     ['Addizionali', 0, o.addizionali],
     ['IRAP', 0, o.irap],
     ['Totale imposte e contributi', f.totaleCarico, o.totaleCarico],
