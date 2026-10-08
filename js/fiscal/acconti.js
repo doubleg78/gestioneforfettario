@@ -4,7 +4,7 @@ import { round2 } from './utils.js';
  * Acconti imposta sostitutiva (metodo storico): 100% dell'imposta dell'anno precedente.
  * - fino a 51,65 € : nessun acconto
  * - fino a 257,52 € : rata unica a novembre
- * - oltre: due rate (50% a giugno, saldo a novembre)
+ * - oltre: due rate (40% a giugno, 60% a novembre)
  */
 export function accontiSostitutiva(params, impostaAnnoPrecedente) {
   const a = params.forfettario.acconto;

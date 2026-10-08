@@ -6,7 +6,7 @@ import { contributiGestioneSeparata, contributiIvs, contributiCassa } from '../j
 import { calcolaForfettario, aliquotaSostitutiva, bolloDovuto } from '../js/fiscal/forfettario.js';
 import { calcolaOrdinario } from '../js/fiscal/ordinario.js';
 import { confrontaRegimi, scenari } from '../js/fiscal/confronto.js';
-import { verificaSoglieRicavi, verificaCauseEsclusione } from '../js/fiscal/requisiti.js';
+import { verificaSoglieRicavi, verificaCauseEsclusione, verificaRequisitiStartup } from '../js/fiscal/requisiti.js';
 import { accontiSostitutiva, saldoSostitutiva } from '../js/fiscal/acconti.js';
 
 const p = parametriAnno(2026);
@@ -167,7 +167,17 @@ test('cause di esclusione', () => {
 test('acconti sostitutiva', () => {
   assert.deepEqual(accontiSostitutiva(p, 40), { prima: 0, seconda: 0, totale: 0 });
   assert.deepEqual(accontiSostitutiva(p, 200), { prima: 0, seconda: 200, totale: 200 });
-  assert.deepEqual(accontiSostitutiva(p, 1001), { prima: 500.5, seconda: 500.5, totale: 1001 });
+  assert.deepEqual(accontiSostitutiva(p, 1001), { prima: 400.4, seconda: 600.6, totale: 1001 });
   assert.equal(saldoSostitutiva(4000, 3000), 1000);
   assert.equal(saldoSostitutiva(2000, 3000), -1000);
+});
+
+test('requisiti startup 5%', () => {
+  assert.equal(verificaRequisitiStartup({}).ammesso, true);
+  assert.equal(verificaRequisitiStartup({ attivitaNeiTreAnniPrecedenti: true }).ammesso, false);
+  assert.equal(verificaRequisitiStartup({ proseguitaAttivitaAltroSoggetto: true, ricaviAttivitaRilevata: 90000 }).ammesso, false);
+});
+
+test('codici tributo F24 forfettari', () => {
+  assert.deepEqual(p.forfettario.codiciTributo, { accontoPrimaRata: '1790', accontoSecondaRataOUnica: '1791', saldo: '1792' });
 });

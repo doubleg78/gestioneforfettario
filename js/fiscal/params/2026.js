@@ -15,10 +15,16 @@ export default {
     },
     aliquote: { ordinaria: 0.15, startup: 0.05, anniStartup: 5 },
     bollo: { sogliaImporto: 77.47, importo: 2 },
-    riduzioneContributiIvs: 0.35,     // L. 190/2014 c. 77, su richiesta; daVerificare
-    daVerificare: ['riduzioneContributiIvs'],
-    // Acconto: 100% dell'imposta dell'anno precedente (metodo storico), 2 rate
-    acconto: { sogliaMinima: 51.65, sogliaRataUnica: 257.52, percentualeRata1: 0.5, daVerificare: true },
+    // VERIFICATO su Normattiva: L. 190/2014 art. 1 c. 77 (contribuzione ridotta del 35%,
+    // solo gestioni artigiani/commercianti L. 233/1990; richiesta all'INPS)
+    riduzioneContributiIvs: 0.35,
+    // Acconto: 100% dell'imposta dell'anno precedente (metodo storico), 2 rate.
+    // Il c. 64 rinvia alle regole di versamento IRPEF (art. 17 DPR 435/2001: 40% + 60%).
+    // Il 50%+50% (art. 58 DL 124/2019) vale per i soggetti ISA, non per i forfettari: v. nota in BRIEFING.md.
+    acconto: { sogliaMinima: 51.65, sogliaRataUnica: 257.52, percentualeRata1: 0.4 },
+    // Codici tributo F24 (Risoluzione AdE 59/E del 11/6/2015)
+    codiciTributo: { accontoPrimaRata: '1790', accontoSecondaRataOUnica: '1791', saldo: '1792' },
+    daVerificare: ['soglia 35.000 € lavoro dipendente (solo fonti secondarie)', 'scadenze e proroghe 2026'],
     // Coefficienti di redditività per gruppo di settore (Allegato 4 L. 190/2014)
     coefficienti: {
       'industrie-alimentari-bevande': 0.40,
@@ -33,8 +39,8 @@ export default {
     },
   },
 
-  // Fonti: circolare INPS n. 8 del 3/2/2026 (Gestione Separata); minimale/massimale riportati
-  // da fonti secondarie concordi (18.808 / 122.295).
+  // VERIFICATO su INPS: circolare n. 8 del 3/2/2026 (26,07% = 25% IVS + 0,72% + 0,35% ISCRO;
+  // 24% con altra copertura; minimale 18.808 €; massimale 122.295 €).
   gestioneSeparata: {
     aliquotaProfessionistaSenzaCopertura: 0.2607, // 25% IVS + 0,72% + 0,35% ISCRO
     aliquotaConAltraCopertura: 0.24,
@@ -42,7 +48,8 @@ export default {
     massimale: 122295,
   },
 
-  // Fonte: circolare INPS n. 14 del 9/2/2026.
+  // VERIFICATO su INPS: circolare n. 14 del 9/2/2026 (aliquote, minimale, maggiorazione e massimale
+  // da risultati di ricerca che citano la circolare; testo integrale non letto per intero).
   ivs: {
     minimale: 18808,
     aliquote: { artigiani: 0.24, commercianti: 0.2448 },

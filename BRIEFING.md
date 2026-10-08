@@ -63,3 +63,19 @@ tests/          test del motore di calcolo (pagina HTML o Node)
 - Parametri 2025/2026: aliquote Gestione Separata, minimali e contributi IVS, scaglioni IRPEF, addizionali, soglie di esclusione.
 - Gestione dei contribuenti con casse professionali proprie (serve una tabella parametrizzata per cassa).
 - Regole di acconto e saldo, e codici tributo F24 aggiornati.
+
+## Stato delle verifiche normative (parametri 2026)
+
+| Punto | Esito | Fonte |
+|---|---|---|
+| Riduzione contributi 35% | Verificato. Vale solo per artigiani/commercianti, su richiesta | L. 190/2014 art. 1 c. 77 (Normattiva) |
+| Imponibile forfettario meno contributi versati | Verificato; l'eccedenza è deducibile dal reddito complessivo | L. 190/2014 c. 64 (Normattiva) |
+| Condizioni aliquota 5% | Verificato; tre condizioni, implementate in `verificaRequisitiStartup` | L. 190/2014 c. 65 (Normattiva) |
+| Cause di esclusione | Verificato, compresa la lett. d-bis (clienti ex datori di lavoro) | L. 190/2014 c. 57 (Normattiva) |
+| Gestione Separata 2026 | Verificato: 26,07%, 24%, minimale 18.808 €, massimale 122.295 € | INPS, circolare 8/2026 |
+| Codici tributo F24 | Verificato: 1790 acconto I rata, 1791 acconto II rata o unica, 1792 saldo | AdE, Risoluzione 59/E/2015 |
+| Acconti | **Corretto**: 40% + 60%, non 50/50. Il 50/50 dell'art. 58 DL 124/2019 vale per i soggetti ISA (art. 12-quinquies DL 34/2019). Il c. 64 rinvia alle regole IRPEF. Alcune guide parlano di 50/50 anche per i forfettari: da riconfermare su prassi AdE prima dell'uso | Normattiva |
+| IVS 2026 | Aliquote, minimale e massimali coerenti tra INPS e fonti secondarie; testo integrale della circolare 14/2026 non letto per intero | INPS circ. 14/2026 |
+| Soglia 35.000 € lavoro dipendente | Solo fonti secondarie (L. 199/2025 c. 27); Normattiva riporta ancora 30.000 € nel testo base | da confermare |
+| Coefficienti di redditività | Allegato 4 non presente nel testo estratto; valori noti, da confrontare con la tabella ufficiale | da confermare |
+| Scadenze 2026 e proroghe (es. 20 luglio) | Riferite da fonti secondarie, non verificate | da confermare |

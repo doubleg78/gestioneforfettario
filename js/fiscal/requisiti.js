@@ -28,6 +28,8 @@ export function verificaCauseEsclusione(params, dati) {
       descrizione: `Redditi da lavoro dipendente/assimilati entro ${limite.toLocaleString('it-IT')} € (non rileva se il rapporto è cessato)` },
     { codice: 'partecipazioni', ok: !dati.partecipazioneSocietaControllate,
       descrizione: 'Nessun controllo di SRL o partecipazione in società di persone/associazioni/imprese familiari in attività riconducibili' },
+    { codice: 'clienti-ex-datori', ok: !dati.attivitaVersoExDatoriLavoro,
+      descrizione: 'Attività non prevalentemente verso datori di lavoro attuali o dei due anni precedenti (art. 1 c. 57 lett. d-bis)' },
     { codice: 'altri-regimi', ok: !dati.regimiSpeciali,
       descrizione: 'Non si applicano regimi speciali IVA o forfettari incompatibili' },
     { codice: 'non-residente', ok: !dati.nonResidente,
@@ -36,4 +38,19 @@ export function verificaCauseEsclusione(params, dati) {
       descrizione: 'Non effettua in via esclusiva o prevalente cessione di fabbricati, terreni edificabili o mezzi di trasporto nuovi' },
   ];
   return { cause, esclusioni: cause.filter((c) => !c.ok).map((c) => c.codice), ammesso: cause.every((c) => c.ok) };
+}
+
+/**
+ * Condizioni per l'aliquota 5% (art. 1 c. 65 L. 190/2014): tutte devono valere.
+ */
+export function verificaRequisitiStartup(dati) {
+  const condizioni = [
+    { codice: 'nessuna-attivita-3-anni', ok: !dati.attivitaNeiTreAnniPrecedenti,
+      descrizione: 'Nessuna attività artistica, professionale o d’impresa nei 3 anni precedenti' },
+    { codice: 'non-prosecuzione', ok: !dati.prosecuzioneAltraAttivita,
+      descrizione: 'L’attività non è mera prosecuzione di lavoro dipendente/autonomo precedente (esclusa la pratica obbligatoria)' },
+    { codice: 'ricavi-attivita-rilevata', ok: !dati.proseguitaAttivitaAltroSoggetto || dati.ricaviAttivitaRilevata <= 85000,
+      descrizione: 'Se si prosegue l’attività di un altro soggetto, i suoi ricavi precedenti non superano 85.000 €' },
+  ];
+  return { condizioni, ammesso: condizioni.every((c) => c.ok) };
 }
